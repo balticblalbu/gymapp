@@ -43,9 +43,13 @@ class TokenStore(context: Context) {
         get() = prefs.getString(KEY_NAME, "Athlet") ?: "Athlet"
         set(value) = prefs.edit().putString(KEY_NAME, value).apply()
 
-    /** Where the app looks for a newer build. JSON manifest or a direct .apk. */
+    /**
+     * Where the app looks for a newer build. Defaults to this project's GitHub
+     * releases: "latest" is a permanent redirect to the newest release, so the
+     * address never has to change again. Editable in the settings.
+     */
     var updateUrl: String
-        get() = prefs.getString(KEY_UPDATE_URL, "") ?: ""
+        get() = prefs.getString(KEY_UPDATE_URL, DEFAULT_UPDATE_URL) ?: DEFAULT_UPDATE_URL
         set(value) = prefs.edit().putString(KEY_UPDATE_URL, value.trim()).apply()
 
     var unitSystem: String
@@ -60,5 +64,7 @@ class TokenStore(context: Context) {
         const val KEY_UNITS = "unit_system"
         const val KEY_UPDATE_URL = "update_url"
         const val DEFAULT_MODEL = "claude-opus-5"
+        const val DEFAULT_UPDATE_URL =
+            "https://github.com/jpaetrow-dotcom/gymapp/releases/latest/download/update.json"
     }
 }

@@ -9,7 +9,7 @@ set -euo pipefail
 CODE="${1:?Versionscode fehlt, z.B. 2}"
 NAME="${2:?Versionsname fehlt, z.B. 1.1.0}"
 NOTES="${3:-}"
-REPO="${GITHUB_REPO:?Bitte GITHUB_REPO setzen, z.B. export GITHUB_REPO=deinname/gym-app}"
+REPO="${GITHUB_REPO:-jpaetrow-dotcom/gymapp}"
 
 cd "$(dirname "$0")"
 

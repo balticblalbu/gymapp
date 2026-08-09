@@ -6,10 +6,10 @@ Die App holt sich Updates selbst — du musst nie wieder eine APK aufs Handy kop
 
 1. Auf GitHub ein Repository anlegen (privat geht auch **nicht** — die Release-Assets müssen
    ohne Login erreichbar sein, also **öffentlich**; im Repo selbst muss kein Code liegen).
-2. In der App unter **Profil → App-Update** diese Adresse eintragen:
+2. In der App ist die Adresse bereits voreingestellt (Profil → App-Update):
 
    ```
-   https://github.com/DEINNAME/DEINREPO/releases/latest/download/update.json
+   https://github.com/jpaetrow-dotcom/gymapp/releases/latest/download/update.json
    ```
 
    `latest` ist eine dauerhafte Weiterleitung auf das neueste Release — die Adresse
@@ -18,7 +18,6 @@ Die App holt sich Updates selbst — du musst nie wieder eine APK aufs Handy kop
 ## Neue Version veröffentlichen
 
 ```bash
-export GITHUB_REPO=deinname/deinrepo
 ./release.sh 2 1.1.0 "Sende-Bug behoben"
 ```
 
