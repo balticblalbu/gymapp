@@ -1,0 +1,528 @@
+<meta charset="utf-8">
+<title>AI Workout Tracker – Design-Vorschau</title>
+<style>
+  :root {
+    --bg: #07080A;
+    --page-fg: #E8ECF2;
+    /* App dark theme */
+    --d-bg: #0B0D11;
+    --d-surface: #141821;
+    --d-surface-2: #1B2029;
+    --d-line: #262C38;
+    --d-fg: #F2F5F9;
+    --d-muted: #8A93A3;
+    --accent: #C8F751;
+    --accent-dim: #A6D42F;
+    --pos: #5BE49B;
+    --neg: #FF6B6B;
+    --blue: #6AA9FF;
+    /* App light theme */
+    --l-bg: #F4F6FA;
+    --l-surface: #FFFFFF;
+    --l-surface-2: #EDF0F6;
+    --l-line: #DFE4EE;
+    --l-fg: #10141B;
+    --l-muted: #66707F;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 32px 20px 64px;
+    background: radial-gradient(1200px 600px at 50% -10%, #14181F 0%, var(--bg) 60%);
+    color: var(--page-fg);
+    font-family: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  h1 { font-size: 26px; font-weight: 700; letter-spacing: -.02em; margin: 0 0 6px; text-align: center; }
+  .sub { text-align: center; color: #8A93A3; font-size: 14px; margin: 0 0 36px; }
+  .rail { display: flex; gap: 28px; overflow-x: auto; padding: 8px 4px 24px; scroll-snap-type: x mandatory; }
+  .rail::-webkit-scrollbar { height: 8px; }
+  .rail::-webkit-scrollbar-thumb { background: #262C38; border-radius: 8px; }
+  .item { scroll-snap-align: center; flex: 0 0 auto; }
+  .caption { text-align: center; font-size: 12px; color: #8A93A3; margin-top: 12px; letter-spacing: .04em; text-transform: uppercase; }
+  .caption b { color: var(--accent); font-weight: 600; }
+
+  /* ---- phone frame ---- */
+  .phone {
+    width: 340px; height: 736px; border-radius: 40px; padding: 10px;
+    background: linear-gradient(160deg, #2A303C, #12151B);
+    box-shadow: 0 30px 60px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.06);
+  }
+  .screen {
+    width: 100%; height: 100%; border-radius: 31px; overflow: hidden;
+    display: flex; flex-direction: column; position: relative;
+    background: var(--d-bg); color: var(--d-fg);
+    font-size: 14px;
+  }
+  .screen.light { background: var(--l-bg); color: var(--l-fg); }
+  .screen.light .card { background: var(--l-surface); border-color: var(--l-line); }
+  .screen.light .muted { color: var(--l-muted); }
+  .screen.light .topbar { background: linear-gradient(180deg, var(--l-bg), rgba(244,246,250,0)); }
+  .screen.light .nav { background: rgba(255,255,255,.92); border-color: var(--l-line); }
+  .screen.light .chip { background: var(--l-surface-2); border-color: var(--l-line); }
+  .screen.light .setrow { background: var(--l-surface-2); }
+  .screen.light .divider { background: var(--l-line); }
+
+  .status { display: flex; justify-content: space-between; padding: 12px 22px 2px; font-size: 11px; color: var(--d-muted); font-weight: 600; }
+  .screen.light .status { color: var(--l-muted); }
+  .body { flex: 1; overflow: hidden; padding: 4px 18px 0; }
+  .topbar { padding: 10px 0 14px; }
+  .hello { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--d-muted); }
+  .screen.light .hello { color: var(--l-muted); }
+  .title { font-size: 26px; font-weight: 700; letter-spacing: -.03em; margin-top: 2px; }
+  .muted { color: var(--d-muted); }
+
+  .card {
+    background: var(--d-surface); border: 1px solid var(--d-line);
+    border-radius: 20px; padding: 16px; margin-bottom: 12px;
+  }
+  .card.accent {
+    background: linear-gradient(140deg, rgba(200,247,81,.16), rgba(200,247,81,.03));
+    border-color: rgba(200,247,81,.28);
+  }
+  .row { display: flex; align-items: center; justify-content: space-between; }
+  .label { font-size: 11px; letter-spacing: .09em; text-transform: uppercase; color: var(--d-muted); font-weight: 600; }
+  .screen.light .label { color: var(--l-muted); }
+
+  .stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 12px; }
+  .stat { background: var(--d-surface); border: 1px solid var(--d-line); border-radius: 16px; padding: 12px 10px; }
+  .screen.light .stat { background: var(--l-surface); border-color: var(--l-line); }
+  .stat .v { font-size: 19px; font-weight: 700; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .stat .k { font-size: 10px; text-transform: uppercase; letter-spacing: .07em; color: var(--d-muted); margin-top: 3px; }
+  .screen.light .stat .k { color: var(--l-muted); }
+
+  .ex { display: flex; justify-content: space-between; align-items: flex-start; padding: 11px 0; }
+  .ex + .ex { border-top: 1px solid var(--d-line); }
+  .screen.light .ex + .ex { border-color: var(--l-line); }
+  .ex .n { font-weight: 600; font-size: 14.5px; }
+  .ex .s { font-size: 12.5px; color: var(--d-muted); margin-top: 3px; font-variant-numeric: tabular-nums; }
+  .screen.light .ex .s { color: var(--l-muted); }
+  .ex .v { font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; text-align: right; }
+
+  .pill { font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 999px; font-variant-numeric: tabular-nums; }
+  .pill.up { color: #0B0D11; background: var(--accent); }
+  .pill.pos { color: var(--pos); background: rgba(91,228,155,.12); }
+  .pill.neg { color: var(--neg); background: rgba(255,107,107,.12); }
+
+  .bar { height: 6px; border-radius: 999px; background: var(--d-surface-2); overflow: hidden; }
+  .screen.light .bar { background: var(--l-surface-2); }
+  .bar > i { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--accent-dim), var(--accent)); }
+  .bar > i.b { background: linear-gradient(90deg, #3D6FB5, var(--blue)); }
+  .bar > i.r { background: linear-gradient(90deg, #B54A4A, var(--neg)); }
+
+  .mg { display: flex; align-items: center; gap: 10px; padding: 7px 0; }
+  .mg .name { width: 78px; font-size: 12.5px; }
+  .mg .bar { flex: 1; }
+  .mg .pct { width: 52px; text-align: right; font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+  .chip {
+    display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600;
+    padding: 6px 11px; border-radius: 999px; background: var(--d-surface-2); border: 1px solid var(--d-line);
+  }
+  .chip.on { background: var(--accent); color: #0B0D11; border-color: var(--accent); }
+  .chips { display: flex; gap: 7px; margin-bottom: 12px; flex-wrap: wrap; }
+
+  .nav {
+    display: flex; justify-content: space-around; align-items: center; padding: 9px 6px 14px;
+    background: rgba(20,24,33,.92); border-top: 1px solid var(--d-line); backdrop-filter: blur(12px);
+  }
+  .nav div { display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 9.5px; color: var(--d-muted); font-weight: 600; }
+  .nav div.on { color: var(--accent); }
+  .screen.light .nav div { color: var(--l-muted); }
+  .screen.light .nav div.on { color: #4E7A00; }
+  .nav svg { width: 21px; height: 21px; }
+
+  .fab {
+    position: absolute; right: 18px; bottom: 84px; width: 54px; height: 54px; border-radius: 18px;
+    background: var(--accent); color: #0B0D11; display: grid; place-items: center;
+    box-shadow: 0 10px 24px rgba(200,247,81,.28);
+  }
+
+  .setrow {
+    display: grid; grid-template-columns: 26px 1fr 1fr 34px; gap: 8px; align-items: center;
+    background: var(--d-surface-2); border-radius: 12px; padding: 9px 11px; margin-bottom: 6px;
+    font-variant-numeric: tabular-nums;
+  }
+  .setrow .idx { font-size: 11px; font-weight: 700; color: var(--d-muted); }
+  .setrow .val { font-size: 14px; font-weight: 600; }
+  .setrow .unit { font-size: 11px; color: var(--d-muted); font-weight: 500; }
+  .divider { height: 1px; background: var(--d-line); margin: 12px 0; }
+
+  .day { aspect-ratio: 1; border-radius: 9px; display: grid; place-items: center; font-size: 11px; color: var(--d-muted); }
+  .day.has { background: rgba(200,247,81,.16); color: var(--accent); font-weight: 700; }
+  .day.hi { background: var(--accent); color: #0B0D11; font-weight: 700; }
+  .day.pr { position: relative; }
+  .day.pr::after { content: ""; position: absolute; bottom: 4px; width: 4px; height: 4px; border-radius: 50%; background: var(--neg); }
+  .cal { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; }
+  .dow { font-size: 9.5px; text-align: center; color: var(--d-muted); text-transform: uppercase; letter-spacing: .05em; padding-bottom: 3px; }
+
+  .tg { max-width: 380px; margin: 0 auto; }
+  .msg { border-radius: 16px; padding: 11px 13px; margin-bottom: 9px; font-size: 13.5px; line-height: 1.45; }
+  .msg.me { background: #2B5278; margin-left: 46px; border-bottom-right-radius: 5px; }
+  .msg.bot { background: var(--d-surface); border: 1px solid var(--d-line); margin-right: 30px; border-bottom-left-radius: 5px; }
+  .msg .t { font-size: 10px; color: var(--d-muted); margin-top: 5px; }
+  .btns { display: flex; gap: 6px; margin-top: 9px; }
+  .btns span { flex: 1; text-align: center; font-size: 12px; font-weight: 600; padding: 8px; border-radius: 10px; background: var(--d-surface-2); border: 1px solid var(--d-line); }
+  .btns span.p { background: var(--accent); color: #0B0D11; border-color: var(--accent); }
+
+  .note { max-width: 720px; margin: 40px auto 0; font-size: 13px; line-height: 1.7; color: #97A0B0; border-top: 1px solid #1E232C; padding-top: 22px; }
+  .note b { color: var(--accent); }
+  .swatches { display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
+  .sw { font-size: 11px; text-align: center; }
+  .sw i { display: block; width: 54px; height: 34px; border-radius: 9px; margin-bottom: 5px; border: 1px solid rgba(255,255,255,.1); }
+</style>
+
+<h1>AI Workout Tracker – Design-Vorschau</h1>
+<p class="sub">Entwurf der App-Screens. Sag mir, was du anders willst – Farben, Dichte, Reihenfolge, alles.</p>
+
+<div class="rail">
+
+  <!-- ============ 1. DASHBOARD DARK ============ -->
+  <div class="item">
+    <div class="phone"><div class="screen">
+      <div class="status"><span>9:41</span><span>▮▮▮ ᯤ 84%</span></div>
+      <div class="body">
+        <div class="topbar">
+          <div class="hello">Sonntag, 9. August</div>
+          <div class="title">Servus, Jan</div>
+        </div>
+
+        <div class="stat-grid">
+          <div class="stat"><div class="v">12.4<span style="font-size:12px"> t</span></div><div class="k">Volumen 30 T</div></div>
+          <div class="stat"><div class="v">18</div><div class="k">Trainings</div></div>
+          <div class="stat"><div class="v">9</div><div class="k">Serie · Tage</div></div>
+        </div>
+
+        <div class="card accent">
+          <div class="row" style="margin-bottom:12px">
+            <span class="label" style="color:var(--accent)">Training heute</span>
+            <span class="pill up">+8,4 %</span>
+          </div>
+          <div class="ex">
+            <div><div class="n">Bankdrücken</div><div class="s">100 kg × 10 × 3</div></div>
+            <div class="v">3.000 kg</div>
+          </div>
+          <div class="ex">
+            <div><div class="n">Kniebeuge</div><div class="s">120 kg × 8 × 4</div></div>
+            <div class="v">3.840 kg</div>
+          </div>
+          <div class="ex">
+            <div><div class="n">Latzug</div><div class="s">70 kg × 10 × 3</div></div>
+            <div class="v">2.100 kg</div>
+          </div>
+          <div class="divider"></div>
+          <div class="row">
+            <span class="muted" style="font-size:12px">10 Sätze · 98 Wdh · 1 h 12 min</span>
+            <span style="font-weight:700">8.940 kg</span>
+          </div>
+        </div>
+
+        <div class="card" style="padding:14px 16px">
+          <div class="row" style="margin-bottom:4px">
+            <div><div style="font-size:13px;font-weight:600">🔥 Neuer Rekord</div>
+            <div class="muted" style="font-size:12px;margin-top:2px">Bankdrücken · vorher 135 kg</div></div>
+            <div style="text-align:right"><div style="font-size:20px;font-weight:700">140 kg</div>
+            <span class="pill pos">+3,7 %</span></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="row" style="margin-bottom:8px">
+            <span class="label">Muskelgruppen · 30 Tage</span>
+            <span class="muted" style="font-size:11px">Details ›</span>
+          </div>
+          <div class="mg"><span class="name">Brust</span><span class="bar"><i style="width:72%"></i></span><span class="pct" style="color:var(--pos)">+12,3</span></div>
+          <div class="mg"><span class="name">Rücken</span><span class="bar"><i style="width:58%"></i></span><span class="pct" style="color:var(--pos)">+8,7</span></div>
+          <div class="mg"><span class="name">Beine</span><span class="bar"><i style="width:86%"></i></span><span class="pct" style="color:var(--pos)">+15,2</span></div>
+          <div class="mg"><span class="name">Schultern</span><span class="bar"><i class="r" style="width:22%"></i></span><span class="pct" style="color:var(--neg)">−2,1</span></div>
+        </div>
+      </div>
+
+      <div class="fab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></div>
+      <div class="nav">
+        <div class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 10.5 12 3l9 7.5V21H3z"/></svg>Start</div>
+        <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 7v10M18 7v10M3 10v4M21 10v4M6 12h12"/></svg>Training</div>
+        <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19V9M10 19V5M16 19v-7M22 19H2"/></svg>Statistik</div>
+        <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M8 3v4M16 3v4M3 11h18"/></svg>Verlauf</div>
+        <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-6 8-6s8 2 8 6"/></svg>Profil</div>
+      </div>
+    </div></div>
+    <div class="caption"><b>1</b> · Dashboard (Dark)</div>
+  </div>
+
+  <!-- ============ 2. TRAINING ============ -->
+  <div class="item">
+    <div class="phone"><div class="screen">
+      <div class="status"><span>9:41</span><span>▮▮▮ ᯤ 84%</span></div>
+      <div class="body">
+        <div class="topbar">
+          <div class="row">
+            <div>
+              <div class="hello">Läuft · 42:18</div>
+              <div class="title">Push A</div>
+            </div>
+            <span class="chip on">Beenden</span>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="row" style="margin-bottom:10px">
+            <div><div style="font-weight:700;font-size:15px">Bankdrücken</div>
+              <div class="muted" style="font-size:11.5px;margin-top:2px">Brust · Langhantel</div></div>
+            <span class="pill pos">e1RM 133 kg</span>
+          </div>
+          <div class="setrow"><span class="idx">1</span><span><span class="val">100</span> <span class="unit">kg</span></span><span><span class="val">10</span> <span class="unit">Wdh</span></span><span style="color:var(--pos)">✓</span></div>
+          <div class="setrow"><span class="idx">2</span><span><span class="val">100</span> <span class="unit">kg</span></span><span><span class="val">9</span> <span class="unit">Wdh</span></span><span style="color:var(--pos)">✓</span></div>
+          <div class="setrow" style="border:1px dashed var(--accent);background:rgba(200,247,81,.07)"><span class="idx" style="color:var(--accent)">3</span><span><span class="val">100</span> <span class="unit">kg</span></span><span><span class="val">8</span> <span class="unit">Wdh</span></span><span class="muted">›</span></div>
+          <div class="row" style="margin-top:10px">
+            <span class="chip">+ Satz</span>
+            <span class="muted" style="font-size:11.5px">Volumen 2.700 kg</span>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="row" style="margin-bottom:10px">
+            <div><div style="font-weight:700;font-size:15px">Schrägbankdrücken</div>
+              <div class="muted" style="font-size:11.5px;margin-top:2px">Brust · Kurzhantel</div></div>
+            <span class="muted">⋮</span>
+          </div>
+          <div class="setrow"><span class="idx">1</span><span><span class="val">30</span> <span class="unit">kg</span></span><span><span class="val">12</span> <span class="unit">Wdh</span></span><span style="color:var(--pos)">✓</span></div>
+          <div class="setrow"><span class="idx">2</span><span><span class="val">30</span> <span class="unit">kg</span></span><span><span class="val">11</span> <span class="unit">Wdh</span></span><span style="color:var(--pos)">✓</span></div>
+        </div>
+
+        <div class="card" style="border-style:dashed;text-align:center;color:var(--d-muted);padding:14px">
+          + Übung hinzufügen
+        </div>
+      </div>
+
+      <div class="nav">
+        <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 10.5 12 3l9 7.5V21H3z"/></svg>Start</div>
+        <div class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 7v10M18 7v10M3 10v4M21 10v4M6 12h12"/></svg>Training</div>
+        <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19V9M10 19V5M16 19v-7M22 19H2"/></svg>Statistik</div>
+        <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M8 3v4M16 3v4M3 11h18"/></svg>Verlauf</div>
+        <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-6 8-6s8 2 8 6"/></svg>Profil</div>
+      </div>
+    </div></div>
+    <div class="caption"><b>2</b> · Training läuft</div>
+  </div>
+
+  <!-- ============ 3. ÜBUNGSSTATISTIK ============ -->
+  <div class="item">
+    <div class="phone"><div class="screen">
+      <div class="status"><span>9:41</span><span>▮▮▮ ᯤ 84%</span></div>
+      <div class="body">
+        <div class="topbar">
+          <div class="hello">‹ Übung</div>
+          <div class="title">Bankdrücken</div>
+        </div>
+
+        <div class="chips">
+          <span class="chip">7 T</span><span class="chip">30 T</span>
+          <span class="chip on">3 M</span><span class="chip">1 J</span><span class="chip">Alles</span>
+        </div>
+
+        <div class="card">
+          <div class="row" style="margin-bottom:10px">
+            <span class="label">Geschätztes 1RM</span>
+            <span class="pill pos">+12,4 %</span>
+          </div>
+          <svg viewBox="0 0 300 108" style="width:100%;height:108px">
+            <defs>
+              <linearGradient id="g1" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#C8F751" stop-opacity=".34"/>
+                <stop offset="100%" stop-color="#C8F751" stop-opacity="0"/>
+              </linearGradient>
+            </defs>
+            <line x1="0" y1="26" x2="300" y2="26" stroke="#262C38" stroke-width="1"/>
+            <line x1="0" y1="60" x2="300" y2="60" stroke="#262C38" stroke-width="1"/>
+            <line x1="0" y1="94" x2="300" y2="94" stroke="#262C38" stroke-width="1"/>
+            <path d="M4 86 L52 78 L100 64 L148 66 L196 46 L244 34 L292 20 L292 104 L4 104 Z" fill="url(#g1)"/>
+            <path d="M4 86 L52 78 L100 64 L148 66 L196 46 L244 34 L292 20" fill="none" stroke="#C8F751" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/>
+            <circle cx="244" cy="34" r="4.5" fill="#0B0D11" stroke="#C8F751" stroke-width="2.4"/>
+            <circle cx="292" cy="20" r="5" fill="#C8F751"/>
+          </svg>
+          <div class="row" style="margin-top:6px">
+            <span class="muted" style="font-size:11px">Mai</span>
+            <span class="muted" style="font-size:11px">Jun</span>
+            <span class="muted" style="font-size:11px">Jul</span>
+            <span class="muted" style="font-size:11px">Aug</span>
+          </div>
+        </div>
+
+        <div class="stat-grid" style="grid-template-columns:repeat(2,1fr)">
+          <div class="stat"><div class="v">140 kg</div><div class="k">Bestleistung</div></div>
+          <div class="stat"><div class="v">12 × 100</div><div class="k">Beste Wdh</div></div>
+          <div class="stat"><div class="v">4.200 kg</div><div class="k">Bestes Volumen</div></div>
+          <div class="stat"><div class="v">105 kg</div><div class="k">Ø Gewicht</div></div>
+        </div>
+
+        <div class="card">
+          <div class="label" style="margin-bottom:10px">Volumen pro Woche</div>
+          <div style="display:flex;align-items:flex-end;gap:9px;height:74px">
+            <div style="flex:1;height:44%;background:#2C3444;border-radius:6px 6px 3px 3px"></div>
+            <div style="flex:1;height:58%;background:#39445A;border-radius:6px 6px 3px 3px"></div>
+            <div style="flex:1;height:72%;background:#4A5B7A;border-radius:6px 6px 3px 3px"></div>
+            <div style="flex:1;height:100%;background:linear-gradient(180deg,#C8F751,#A6D42F);border-radius:6px 6px 3px 3px"></div>
+          </div>
+          <div class="row" style="margin-top:7px">
+            <span class="muted" style="font-size:10.5px">KW 29</span><span class="muted" style="font-size:10.5px">KW 30</span>
+            <span class="muted" style="font-size:10.5px">KW 31</span><span class="muted" style="font-size:10.5px">KW 32</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="nav">
+        <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 10.5 12 3l9 7.5V21H3z"/></svg>Start</div>
+        <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 7v10M18 7v10M3 10v4M21 10v4M6 12h12"/></svg>Training</div>
+        <div class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19V9M10 19V5M16 19v-7M22 19H2"/></svg>Statistik</div>
+        <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M8 3v4M16 3v4M3 11h18"/></svg>Verlauf</div>
+        <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-6 8-6s8 2 8 6"/></svg>Profil</div>
+      </div>
+    </div></div>
+    <div class="caption"><b>3</b> · Übungsstatistik + Charts</div>
+  </div>
+
+  <!-- ============ 4. VERLAUF / KALENDER ============ -->
+  <div class="item">
+    <div class="phone"><div class="screen">
+      <div class="status"><span>9:41</span><span>▮▮▮ ᯤ 84%</span></div>
+      <div class="body">
+        <div class="topbar">
+          <div class="hello">Verlauf</div>
+          <div class="title">August 2026</div>
+        </div>
+
+        <div class="card">
+          <div class="cal" style="margin-bottom:7px">
+            <div class="dow">M</div><div class="dow">D</div><div class="dow">M</div><div class="dow">D</div>
+            <div class="dow">F</div><div class="dow">S</div><div class="dow">S</div>
+          </div>
+          <div class="cal">
+            <div class="day">28</div><div class="day">29</div><div class="day has">30</div><div class="day">31</div>
+            <div class="day has">1</div><div class="day">2</div><div class="day has">3</div>
+            <div class="day has pr">4</div><div class="day">5</div><div class="day has">6</div><div class="day">7</div>
+            <div class="day has">8</div><div class="day hi">9</div><div class="day">10</div>
+          </div>
+          <div class="row" style="margin-top:11px">
+            <span class="muted" style="font-size:11px">● Training &nbsp; ● Rekord</span>
+            <span class="muted" style="font-size:11px">18 Trainings</span>
+          </div>
+        </div>
+
+        <div class="chips">
+          <span class="chip on">Alle</span><span class="chip">Brust</span>
+          <span class="chip">Rücken</span><span class="chip">Beine</span>
+        </div>
+
+        <div class="card">
+          <div class="row" style="margin-bottom:9px">
+            <span style="font-weight:700">9. August</span>
+            <span class="muted" style="font-size:12px">8.940 kg</span>
+          </div>
+          <div class="label" style="margin-bottom:5px">Brust</div>
+          <div class="ex" style="border:0;padding:6px 0">
+            <div><div class="n">Bankdrücken</div><div class="s">100 kg × 10 × 3</div></div>
+            <div class="v">🔥</div>
+          </div>
+          <div class="ex" style="padding:6px 0"><div><div class="n">Cable Fly</div><div class="s">40 kg × 12 × 3</div></div><div class="v"></div></div>
+          <div class="label" style="margin:9px 0 5px">Rücken</div>
+          <div class="ex" style="border:0;padding:6px 0"><div><div class="n">Latzug</div><div class="s">70 kg × 10 × 3</div></div><div class="v"></div></div>
+        </div>
+
+        <div class="card">
+          <div class="row" style="margin-bottom:9px">
+            <span style="font-weight:700">7. August</span>
+            <span class="muted" style="font-size:12px">7.120 kg</span>
+          </div>
+          <div class="ex" style="border:0;padding:6px 0"><div><div class="n">Kniebeuge</div><div class="s">120 kg × 8 × 4</div></div><div class="v"></div></div>
+        </div>
+      </div>
+
+      <div class="nav">
+        <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 10.5 12 3l9 7.5V21H3z"/></svg>Start</div>
+        <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 7v10M18 7v10M3 10v4M21 10v4M6 12h12"/></svg>Training</div>
+        <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19V9M10 19V5M16 19v-7M22 19H2"/></svg>Statistik</div>
+        <div class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M8 3v4M16 3v4M3 11h18"/></svg>Verlauf</div>
+        <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-6 8-6s8 2 8 6"/></svg>Profil</div>
+      </div>
+    </div></div>
+    <div class="caption"><b>4</b> · Verlauf &amp; Kalender</div>
+  </div>
+
+  <!-- ============ 5. LIGHT MODE ============ -->
+  <div class="item">
+    <div class="phone"><div class="screen light">
+      <div class="status"><span>9:41</span><span>▮▮▮ ᯤ 84%</span></div>
+      <div class="body">
+        <div class="topbar">
+          <div class="hello">Sonntag, 9. August</div>
+          <div class="title">Servus, Jan</div>
+        </div>
+
+        <div class="stat-grid">
+          <div class="stat"><div class="v">12.4<span style="font-size:12px"> t</span></div><div class="k">Volumen 30 T</div></div>
+          <div class="stat"><div class="v">18</div><div class="k">Trainings</div></div>
+          <div class="stat"><div class="v">9</div><div class="k">Serie · Tage</div></div>
+        </div>
+
+        <div class="card" style="background:linear-gradient(140deg,#EAF9C4,#F7FDE9);border-color:#D6EE9B">
+          <div class="row" style="margin-bottom:12px">
+            <span class="label" style="color:#5C7A11">Training heute</span>
+            <span class="pill" style="background:#4E7A00;color:#fff">+8,4 %</span>
+          </div>
+          <div class="ex"><div><div class="n">Bankdrücken</div><div class="s">100 kg × 10 × 3</div></div><div class="v">3.000 kg</div></div>
+          <div class="ex"><div><div class="n">Kniebeuge</div><div class="s">120 kg × 8 × 4</div></div><div class="v">3.840 kg</div></div>
+          <div class="ex"><div><div class="n">Latzug</div><div class="s">70 kg × 10 × 3</div></div><div class="v">2.100 kg</div></div>
+          <div class="divider" style="background:#D6EE9B"></div>
+          <div class="row"><span class="muted" style="font-size:12px">10 Sätze · 98 Wdh · 1 h 12 min</span><span style="font-weight:700">8.940 kg</span></div>
+        </div>
+
+        <div class="card">
+          <div class="row" style="margin-bottom:8px"><span class="label">Muskelgruppen · 30 Tage</span></div>
+          <div class="mg"><span class="name">Brust</span><span class="bar"><i style="width:72%;background:linear-gradient(90deg,#8FBF1A,#B4E23C)"></i></span><span class="pct" style="color:#2E7D4F">+12,3</span></div>
+          <div class="mg"><span class="name">Rücken</span><span class="bar"><i style="width:58%;background:linear-gradient(90deg,#8FBF1A,#B4E23C)"></i></span><span class="pct" style="color:#2E7D4F">+8,7</span></div>
+          <div class="mg"><span class="name">Beine</span><span class="bar"><i style="width:86%;background:linear-gradient(90deg,#8FBF1A,#B4E23C)"></i></span><span class="pct" style="color:#2E7D4F">+15,2</span></div>
+          <div class="mg"><span class="name">Schultern</span><span class="bar"><i class="r" style="width:22%"></i></span><span class="pct" style="color:#C43D3D">−2,1</span></div>
+        </div>
+      </div>
+
+      <div class="nav">
+        <div class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 10.5 12 3l9 7.5V21H3z"/></svg>Start</div>
+        <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 7v10M18 7v10M3 10v4M21 10v4M6 12h12"/></svg>Training</div>
+        <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19V9M10 19V5M16 19v-7M22 19H2"/></svg>Statistik</div>
+        <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M8 3v4M16 3v4M3 11h18"/></svg>Verlauf</div>
+        <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-6 8-6s8 2 8 6"/></svg>Profil</div>
+      </div>
+    </div></div>
+    <div class="caption"><b>5</b> · Light Mode</div>
+  </div>
+
+</div>
+
+<div class="tg">
+  <div style="font-size:12px;letter-spacing:.09em;text-transform:uppercase;color:#8A93A3;margin-bottom:12px;text-align:center">So antwortet der Telegram-Bot</div>
+  <div class="msg me">🎤 Sprachnachricht · 0:07<div class="t">„Hab heute Bankdrücken gemacht. Erst 100 Kilo für zehn, dann 110 für acht und danach nochmal 110 für sieben." 9:41</div></div>
+  <div class="msg bot"><b>✓ Gespeichert</b><br><br><b>Bankdrücken</b><br>100 kg × 10, 110 kg × 8, 110 kg × 7<br>Volumen: 2.650 kg<br>vs. letztes Training: +5,2 %<br><br>🔥 <b>NEUER REKORD</b><br>Bestes geschätztes 1RM: <b>139,3 kg</b><br>Vorher: 133,3 kg (+4,5 %)<div class="t">9:41</div></div>
+  <div class="msg me">Beim Squat 140 Kilo gemacht<div class="t">9:43</div></div>
+  <div class="msg bot">Ich habe Folgendes verstanden (62 % sicher):<br><br><b>Kniebeuge</b><br>140 kg<br><br>Wie viele Sätze und Wiederholungen waren das?
+    <div class="btns"><span class="p">✓ Speichern</span><span>✎ Bearbeiten</span><span>✕ Abbrechen</span></div>
+    <div class="t">9:43</div>
+  </div>
+</div>
+
+<div class="note">
+  <b>Designentscheidungen, die du überstimmen kannst:</b><br>
+  <b>Akzentfarbe</b> Volt-Grün <code>#C8F751</code> auf fast-schwarzem Neutral – wirkt sportlich-hochwertig, funktioniert in beiden Themes.
+  Alternativen wären z. B. Orange, Cyan oder ein klassisches Weiß-auf-Schwarz ohne Farbakzent.<br>
+  <b>Zahlen</b> durchgehend tabellarisch (gleiche Ziffernbreite), damit Werte in Spalten ruhig stehen.<br>
+  <b>Dichte</b> bewusst hoch: viele Infos pro Screen, aber durch Karten gruppiert.<br>
+  <b>Navigation</b> 5 Tabs unten: Start · Training · Statistik · Verlauf · Profil.<br>
+  <b>KI-Herkunft</b> Sätze aus Telegram bekommen in der App ein kleines Konfidenz-Badge, manuell bearbeitete verlieren es.
+  <div class="swatches">
+    <div class="sw"><i style="background:#C8F751"></i>Akzent</div>
+    <div class="sw"><i style="background:#0B0D11"></i>Hintergrund</div>
+    <div class="sw"><i style="background:#141821"></i>Karte</div>
+    <div class="sw"><i style="background:#5BE49B"></i>Positiv</div>
+    <div class="sw"><i style="background:#FF6B6B"></i>Negativ</div>
+    <div class="sw"><i style="background:#6AA9FF"></i>Sekundär</div>
+  </div>
+</div>

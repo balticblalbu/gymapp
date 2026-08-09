@@ -1,0 +1,162 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Standardsprache der App: Deutsch. Englische Übersetzung in values-en. -->
+<resources>
+    <string name="app_name">Workout Tracker</string>
+
+    <!-- Navigation -->
+    <string name="nav_dashboard">Start</string>
+    <string name="nav_training">Training</string>
+    <string name="nav_stats">Statistik</string>
+    <string name="nav_history">Verlauf</string>
+    <string name="nav_profile">Profil</string>
+
+    <!-- Anmeldung -->
+    <string name="login_title">Willkommen zurück</string>
+    <string name="login_subtitle">Melde dich an, um dein Training zu synchronisieren.</string>
+    <string name="register_title">Konto erstellen</string>
+    <string name="register_subtitle">Ein Konto, App und Telegram teilen sich die Daten.</string>
+    <string name="field_email">E-Mail</string>
+    <string name="field_password">Passwort</string>
+    <string name="field_name">Name</string>
+    <string name="field_server">Server-Adresse</string>
+    <string name="action_login">Anmelden</string>
+    <string name="action_register">Registrieren</string>
+    <string name="action_to_register">Noch kein Konto? Registrieren</string>
+    <string name="action_to_login">Schon registriert? Anmelden</string>
+
+    <!-- Dashboard -->
+    <string name="dashboard_today">Training heute</string>
+    <string name="dashboard_no_workout">Heute noch kein Training erfasst</string>
+    <string name="dashboard_no_workout_hint">Starte ein Training oder diktiere es dem Telegram-Bot.</string>
+    <string name="dashboard_volume_30d">Volumen 30 T</string>
+    <string name="dashboard_workouts">Trainings</string>
+    <string name="dashboard_streak">Serie · Tage</string>
+    <string name="dashboard_muscle_progress">Muskelgruppen · 30 Tage</string>
+    <string name="dashboard_records">Neue Rekorde</string>
+    <string name="dashboard_vs_last_workout">vs. letztes Training</string>
+    <string name="dashboard_vs_last_week">vs. letzte Woche</string>
+    <string name="dashboard_vs_last_month">vs. letzter Monat</string>
+    <string name="dashboard_strength">Kraftentwicklung</string>
+
+    <!-- Training -->
+    <string name="training_start">Training starten</string>
+    <string name="training_running">Läuft</string>
+    <string name="training_paused">Pausiert</string>
+    <string name="training_pause">Pause</string>
+    <string name="training_resume">Fortsetzen</string>
+    <string name="training_finish">Beenden</string>
+    <string name="training_add_exercise">Übung hinzufügen</string>
+    <string name="training_add_set">Satz hinzufügen</string>
+    <string name="training_no_active">Kein aktives Training</string>
+    <string name="training_no_active_hint">Starte ein neues Training oder bearbeite ein vergangenes im Verlauf.</string>
+    <string name="training_remove_exercise">Übung entfernen</string>
+    <string name="training_notes">Notizen</string>
+
+    <!-- Sätze -->
+    <string name="set_weight">Gewicht</string>
+    <string name="set_reps">Wiederholungen</string>
+    <string name="set_duration">Dauer</string>
+    <string name="set_distance">Distanz</string>
+    <string name="set_rpe">RPE</string>
+    <string name="set_warmup">Aufwärmsatz</string>
+    <string name="set_one_rm_test">Echter 1RM-Versuch</string>
+    <string name="set_number">Satz %1$d</string>
+    <string name="set_delete">Satz löschen</string>
+
+    <!-- Übungen -->
+    <string name="exercises_title">Übungen</string>
+    <string name="exercises_search">Übung suchen</string>
+    <string name="exercises_new">Neue Übung</string>
+    <string name="exercises_edit">Übung bearbeiten</string>
+    <string name="exercises_delete">Übung löschen</string>
+    <string name="exercises_muscle_groups">Muskelgruppen</string>
+    <string name="exercises_type">Übungsart</string>
+    <string name="exercises_equipment">Equipment</string>
+    <string name="exercises_empty">Keine Übung gefunden</string>
+
+    <!-- Statistik -->
+    <string name="stats_title">Statistik</string>
+    <string name="stats_personal_best">Bestleistung</string>
+    <string name="stats_best_reps">Beste Wdh</string>
+    <string name="stats_best_volume">Bestes Volumen</string>
+    <string name="stats_avg_weight">Ø Gewicht</string>
+    <string name="stats_avg_reps">Ø Wiederholungen</string>
+    <string name="stats_progress">Fortschritt</string>
+    <string name="stats_e1rm">Geschätztes 1RM</string>
+    <string name="stats_weight_over_time">Gewicht über Zeit</string>
+    <string name="stats_volume_over_time">Volumen über Zeit</string>
+    <string name="stats_reps_over_time">Wiederholungen über Zeit</string>
+    <string name="stats_sets">Sätze</string>
+    <string name="stats_frequency">Trainingshäufigkeit</string>
+    <string name="stats_weekly_volume">Volumen pro Woche</string>
+    <string name="stats_strongest">Stärkste Muskelgruppen</string>
+    <string name="stats_weakest">Schwächste Muskelgruppen</string>
+    <string name="stats_no_data">Noch nicht genug Daten</string>
+    <string name="stats_e1rm_explainer">Geschätztes 1RM nach Epley: Gewicht × (1 + Wdh / 30). Ab 12 Wiederholungen wird gedeckelt, weil die Formel darüber ungenau wird. Echte 1RM-Versuche sind separat markiert.</string>
+
+    <!-- Zeiträume -->
+    <string name="period_7d">7 T</string>
+    <string name="period_30d">30 T</string>
+    <string name="period_90d">3 M</string>
+    <string name="period_6m">6 M</string>
+    <string name="period_1y">1 J</string>
+    <string name="period_all">Alles</string>
+
+    <!-- Verlauf -->
+    <string name="history_title">Verlauf</string>
+    <string name="history_empty">Noch keine Trainings</string>
+    <string name="history_filter_all">Alle</string>
+    <string name="history_delete_workout">Training löschen</string>
+
+    <!-- Einstellungen -->
+    <string name="settings_title">Profil</string>
+    <string name="settings_account">Konto</string>
+    <string name="settings_units">Einheiten</string>
+    <string name="settings_language">Sprache</string>
+    <string name="settings_timezone">Zeitzone</string>
+    <string name="settings_theme">Erscheinungsbild</string>
+    <string name="settings_theme_system">System</string>
+    <string name="settings_theme_light">Hell</string>
+    <string name="settings_theme_dark">Dunkel</string>
+    <string name="settings_telegram">Telegram</string>
+    <string name="settings_telegram_connected">Verbunden</string>
+    <string name="settings_telegram_disconnected">Nicht verbunden</string>
+    <string name="settings_telegram_connect">Telegram verbinden</string>
+    <string name="settings_telegram_disconnect">Verbindung trennen</string>
+    <string name="settings_telegram_code_title">Code im Telegram-Chat senden</string>
+    <string name="settings_telegram_code_hint">Sende diesen Befehl an den Bot. Der Code ist 15 Minuten gültig.</string>
+    <string name="settings_export">Daten exportieren</string>
+    <string name="settings_export_csv">Als CSV exportieren</string>
+    <string name="settings_export_json">Als JSON exportieren</string>
+    <string name="settings_delete_data">Konto und Daten löschen</string>
+    <string name="settings_logout">Abmelden</string>
+    <string name="settings_sync_now">Jetzt synchronisieren</string>
+    <string name="settings_last_sync">Zuletzt synchronisiert: %1$s</string>
+    <string name="settings_notifications">Benachrichtigungen</string>
+    <string name="settings_ai_model">KI-Modell</string>
+
+    <!-- Allgemein -->
+    <string name="common_save">Speichern</string>
+    <string name="common_cancel">Abbrechen</string>
+    <string name="common_delete">Löschen</string>
+    <string name="common_edit">Bearbeiten</string>
+    <string name="common_close">Schließen</string>
+    <string name="common_retry">Erneut versuchen</string>
+    <string name="common_loading">Wird geladen…</string>
+    <string name="common_offline">Offline – zeige gespeicherte Daten</string>
+    <string name="common_pending_sync">%1$d Änderungen warten auf Synchronisierung</string>
+    <string name="common_confirm_delete">Wirklich löschen?</string>
+    <string name="common_undo">Rückgängig</string>
+    <string name="common_kg">kg</string>
+    <string name="common_lb">lb</string>
+    <string name="common_reps">Wdh</string>
+    <string name="common_sets">Sätze</string>
+    <string name="common_volume">Volumen</string>
+    <string name="common_ai_generated">Von der KI erfasst</string>
+
+    <!-- Fehler -->
+    <string name="error_network">Keine Verbindung zum Server.</string>
+    <string name="error_unauthorized">Sitzung abgelaufen. Bitte erneut anmelden.</string>
+    <string name="error_generic">Etwas ist schiefgelaufen.</string>
+    <string name="error_invalid_input">Bitte Eingaben prüfen.</string>
+</resources>

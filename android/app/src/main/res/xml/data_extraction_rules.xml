@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<data-extraction-rules>
+    <cloud-backup>
+        <!-- Tokens und lokaler Cache gehören nicht ins Cloud-Backup. -->
+        <exclude domain="sharedpref" path="gymapp_secure_prefs.xml" />
+        <exclude domain="database" path="gymapp.db" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="sharedpref" path="gymapp_secure_prefs.xml" />
+    </device-transfer>
+</data-extraction-rules>

@@ -1,0 +1,444 @@
+// AI Workout Tracker – relational schema
+// Design notes:
+//  * Every user-owned, syncable entity carries createdAt / updatedAt / deletedAt
+//    so the Android client can do delta sync ("give me everything changed since X")
+//    including tombstones for deletions.
+//  * Everything that was produced by the AI pipeline keeps `source` + `confidence`
+//    and links back to the AiParsingResult that created it -> full audit trail.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+enum UnitSystem {
+  KG
+  LB
+}
+
+enum ThemePreference {
+  SYSTEM
+  LIGHT
+  DARK
+}
+
+/// How an exercise is measured. Drives which fields of WorkoutSet are relevant.
+enum ExerciseType {
+  STRENGTH // weight + reps
+  BODYWEIGHT // reps (+ optional added weight)
+  CARDIO // duration + distance
+  DURATION // duration only (plank, hang, ...)
+}
+
+enum MuscleRole {
+  PRIMARY
+  SECONDARY
+}
+
+enum WorkoutStatus {
+  IN_PROGRESS
+  COMPLETED
+}
+
+/// Where a record came from. Used for the audit trail and for UI badges.
+enum DataSource {
+  MANUAL
+  TELEGRAM_VOICE
+  TELEGRAM_TEXT
+  /// Spoken into the app and recognised on the device.
+  APP_VOICE
+  /// Typed into the app's AI input field.
+  APP_TEXT
+  IMPORT
+  SEED
+}
+
+enum PersonalRecordType {
+  MAX_WEIGHT
+  MAX_REPS
+  MAX_VOLUME_SET
+  MAX_VOLUME_SESSION
+  BEST_E1RM
+  LONGEST_DURATION
+  LONGEST_DISTANCE
+}
+
+enum TelegramMessageType {
+  TEXT
+  VOICE
+  AUDIO
+  COMMAND
+  CALLBACK
+}
+
+enum AiIntent {
+  LOG_WORKOUT
+  CREATE_EXERCISE
+  CORRECTION
+  QUERY
+  CLARIFICATION_ANSWER
+  SMALL_TALK
+  UNKNOWN
+}
+
+enum AiResultStatus {
+  APPLIED
+  PENDING_CONFIRMATION
+  NEEDS_CLARIFICATION
+  REJECTED
+  FAILED
+}
+
+// ---------------------------------------------------------------------------
+// Users / auth
+// ---------------------------------------------------------------------------
+
+model User {
+  id           String  @id @default(uuid())
+  email        String  @unique
+  passwordHash String
+  name         String
+
+  unitSystem      UnitSystem      @default(KG)
+  locale          String          @default("de")
+  timezone        String          @default("Europe/Berlin")
+  themePreference ThemePreference @default(SYSTEM)
+  /// Optional per-user override of the LLM model used for parsing.
+  aiModel         String?
+  notificationsEnabled Boolean    @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  refreshTokens     RefreshToken[]
+  linkCodes         TelegramLinkCode[]
+  telegramAccount   TelegramAccount?
+  exercises         Exercise[]
+  workouts          Workout[]
+  personalRecords   PersonalRecord[]
+  telegramMessages  TelegramMessage[]
+  conversationState ConversationState[]
+
+  @@map("users")
+}
+
+model RefreshToken {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// SHA-256 of the actual token; the plain token never touches the database.
+  tokenHash String    @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+/// One-time code generated in the Android app, redeemed with `/link ABC123`.
+model TelegramLinkCode {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  code      String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@map("telegram_link_codes")
+}
+
+model TelegramAccount {
+  id             String   @id @default(uuid())
+  userId         String   @unique
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// Telegram numeric user id – the whitelist key for the bot.
+  telegramUserId BigInt   @unique
+  chatId         BigInt
+  username       String?
+  firstName      String?
+  linkedAt       DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@map("telegram_accounts")
+}
+
+// ---------------------------------------------------------------------------
+// Exercise catalogue
+// ---------------------------------------------------------------------------
+
+model MuscleGroup {
+  id     String @id @default(uuid())
+  /// Stable machine key, e.g. "chest". Used by clients and statistics.
+  key    String @unique
+  nameEn String
+  nameDe String
+  /// Coarse bucket used for the dashboard roll-up (e.g. "arms" for biceps/triceps).
+  parentKey String?
+  sortOrder Int    @default(0)
+
+  exercises ExerciseMuscleGroup[]
+
+  @@map("muscle_groups")
+}
+
+model Exercise {
+  id     String  @id @default(uuid())
+  /// null => global exercise shipped by the seed, visible to everybody.
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  name      String
+  nameDe    String?
+  type      ExerciseType @default(STRENGTH)
+  equipment String?
+  notes     String?
+  isCustom  Boolean      @default(false)
+  source    DataSource   @default(MANUAL)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  muscleGroups      ExerciseMuscleGroup[]
+  aliases           ExerciseAlias[]
+  workoutExercises  WorkoutExercise[]
+  personalRecords   PersonalRecord[]
+
+  @@unique([userId, name])
+  @@index([userId, updatedAt])
+  @@map("exercises")
+}
+
+/// Alternative spellings / translations used by the fuzzy exercise matcher,
+/// e.g. "Bankdrücken" or "Benchpress" -> Bench Press.
+model ExerciseAlias {
+  id         String   @id @default(uuid())
+  exerciseId String
+  exercise   Exercise @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+  /// Always stored normalised (lowercase, no diacritics, no punctuation).
+  alias      String
+  locale     String?
+
+  @@unique([exerciseId, alias])
+  @@index([alias])
+  @@map("exercise_aliases")
+}
+
+model ExerciseMuscleGroup {
+  exerciseId    String
+  exercise      Exercise    @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+  muscleGroupId String
+  muscleGroup   MuscleGroup @relation(fields: [muscleGroupId], references: [id], onDelete: Cascade)
+  role          MuscleRole  @default(PRIMARY)
+  /// Share of the set volume attributed to this muscle group (0..1).
+  contribution  Float       @default(1)
+
+  @@id([exerciseId, muscleGroupId])
+  @@map("exercise_muscle_groups")
+}
+
+// ---------------------------------------------------------------------------
+// Workouts
+// ---------------------------------------------------------------------------
+
+model Workout {
+  id     String @id @default(uuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// Calendar day the workout belongs to, in the user's timezone.
+  date        DateTime      @db.Date
+  title       String?
+  notes       String?
+  status      WorkoutStatus @default(COMPLETED)
+  startedAt   DateTime?
+  endedAt     DateTime?
+  /// Accumulated active duration in seconds (pause-aware).
+  durationSec Int?
+  source      DataSource    @default(MANUAL)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  exercises WorkoutExercise[]
+
+  @@index([userId, date])
+  @@index([userId, updatedAt])
+  @@map("workouts")
+}
+
+model WorkoutExercise {
+  id         String   @id @default(uuid())
+  workoutId  String
+  workout    Workout  @relation(fields: [workoutId], references: [id], onDelete: Cascade)
+  exerciseId String
+  exercise   Exercise @relation(fields: [exerciseId], references: [id])
+
+  position Int     @default(0)
+  notes    String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  sets WorkoutSet[]
+
+  @@index([workoutId])
+  @@map("workout_exercises")
+}
+
+model WorkoutSet {
+  id                String          @id @default(uuid())
+  workoutExerciseId String
+  workoutExercise   WorkoutExercise @relation(fields: [workoutExerciseId], references: [id], onDelete: Cascade)
+
+  setNumber Int
+  /// Always stored in kilograms; lb is a presentation concern.
+  weightKg   Float?
+  reps       Int?
+  durationSec Int?
+  distanceM  Float?
+  rpe        Float?
+  isWarmup   Boolean @default(false)
+  /// True when the user actually attempted a true 1-rep-max, so statistics can
+  /// distinguish a measured 1RM from an estimated one.
+  isOneRmTest Boolean @default(false)
+  notes      String?
+
+  source            DataSource @default(MANUAL)
+  /// Confidence of the AI pipeline that produced this set (0..1), null if manual.
+  confidence        Float?
+  aiParsingResultId String?
+  aiParsingResult   AiParsingResult? @relation(fields: [aiParsingResultId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  personalRecords PersonalRecord[]
+
+  @@index([workoutExerciseId])
+  @@map("workout_sets")
+}
+
+// ---------------------------------------------------------------------------
+// Personal records
+// ---------------------------------------------------------------------------
+
+model PersonalRecord {
+  id         String             @id @default(uuid())
+  userId     String
+  user       User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  exerciseId String
+  exercise   Exercise           @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+  type       PersonalRecordType
+
+  /// Numeric value in canonical units: kg / reps / kg (volume) / seconds / meters.
+  value         Float
+  previousValue Float?
+  /// Context for display, e.g. "12 × 100 kg".
+  weightKg Float?
+  reps     Int?
+
+  achievedAt   DateTime
+  workoutSetId String?
+  workoutSet   WorkoutSet? @relation(fields: [workoutSetId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, exerciseId, type, achievedAt])
+  @@map("personal_records")
+}
+
+// ---------------------------------------------------------------------------
+// AI / Telegram audit trail
+// ---------------------------------------------------------------------------
+
+model TelegramMessage {
+  id     String  @id @default(uuid())
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  telegramUserId BigInt
+  chatId         BigInt
+  messageId      BigInt?
+  type           TelegramMessageType
+
+  rawText            String?
+  /// Telegram file id of the voice note (the audio itself is not persisted by default).
+  fileId             String?
+  durationSec        Int?
+  transcript         String?
+  transcriptLanguage String?
+  sttProvider        String?
+
+  createdAt DateTime @default(now())
+
+  parsingResults AiParsingResult[]
+
+  @@index([telegramUserId, createdAt])
+  @@map("telegram_messages")
+}
+
+/// One row per LLM invocation. Keeps input, raw output, normalised result and
+/// the outcome so every stored set can be traced back to what was said.
+model AiParsingResult {
+  id                String           @id @default(uuid())
+  telegramMessageId String?
+  telegramMessage   TelegramMessage? @relation(fields: [telegramMessageId], references: [id], onDelete: SetNull)
+  userId            String?
+
+  provider String
+  model    String
+  intent   AiIntent       @default(UNKNOWN)
+  status   AiResultStatus @default(PENDING_CONFIRMATION)
+
+  inputText     String
+  /// Untouched provider response for debugging.
+  rawResponse   Json?
+  /// Normalised, validated structure that is actually applied.
+  structured    Json?
+  confidence    Float          @default(0)
+  resolvedDate  DateTime?      @db.Date
+  clarification String?
+  error         String?
+  latencyMs     Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  workoutSets WorkoutSet[]
+
+  @@index([userId, createdAt])
+  @@map("ai_parsing_results")
+}
+
+/// Short-lived conversation memory for the bot (follow-up questions,
+/// pending confirmations, correction context).
+model ConversationState {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  chatId    BigInt
+  state     Json
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, chatId])
+  @@index([expiresAt])
+  @@map("conversation_states")
+}
