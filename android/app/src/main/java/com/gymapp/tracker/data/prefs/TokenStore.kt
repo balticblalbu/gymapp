@@ -4,14 +4,22 @@ import android.content.Context
 import android.content.SharedPreferences
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
+import com.gymapp.tracker.BuildConfig
 
 /**
  * Device settings, including the Anthropic API key.
  *
- * The key is entered by the user in the app and stored in
- * EncryptedSharedPreferences, backed by the Android Keystore — it is never
- * compiled into the APK and never leaves the device except in the
- * `x-api-key` header of the request it authenticates.
+ * The key can be entered by hand in the app, or pre-filled from a build-time
+ * default (see [BuildConfig.DEFAULT_ANTHROPIC_KEY]) so a shared key doesn't
+ * have to be typed on every phone. Either way it is stored in
+ * EncryptedSharedPreferences, backed by the Android Keystore, and never leaves
+ * the device except in the `x-api-key` header of the request it authenticates.
+ *
+ * The build-time default is a convenience for a small, trusted group sharing
+ * one key — unlike a value typed into Settings, it *is* present in the
+ * compiled APK and can be extracted from it. It comes from
+ * `android/local.properties` (gitignored), never from a file that reaches the
+ * repository.
  */
 class TokenStore(context: Context) {
 
@@ -32,8 +40,18 @@ class TokenStore(context: Context) {
     }
 
     var anthropicApiKey: String?
+        // Only falls back to the baked-in default when nothing has been
+        // stored yet at all (KEY_HAS_API_DECISION unset) — once the user
+        // saves an empty value on purpose (clearing the key), that decision
+        // sticks and the default is not silently reapplied.
         get() = prefs.getString(KEY_API, null)
-        set(value) = prefs.edit().putString(KEY_API, value).apply()
+            ?: DEFAULT_ANTHROPIC_KEY.takeIf { it.isNotBlank() && !prefs.getBoolean(KEY_HAS_API_DECISION, false) }
+        set(value) {
+            prefs.edit()
+                .putString(KEY_API, value)
+                .putBoolean(KEY_HAS_API_DECISION, true)
+                .apply()
+        }
 
     var aiModel: String
         get() = prefs.getString(KEY_MODEL, DEFAULT_MODEL) ?: DEFAULT_MODEL
@@ -59,6 +77,8 @@ class TokenStore(context: Context) {
     private companion object {
         const val FILE_NAME = "gymapp_secure_prefs"
         const val KEY_API = "anthropic_api_key"
+        const val KEY_HAS_API_DECISION = "anthropic_api_key_decided"
+        val DEFAULT_ANTHROPIC_KEY: String = BuildConfig.DEFAULT_ANTHROPIC_KEY
         const val KEY_MODEL = "ai_model"
         const val KEY_NAME = "display_name"
         const val KEY_UNITS = "unit_system"

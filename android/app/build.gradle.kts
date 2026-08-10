@@ -24,6 +24,14 @@ fun resolveApiUrl(default: String): String =
         ?: (project.findProperty("apiBaseUrl") as String?)
         ?: default
 
+/**
+ * Anthropic key baked in as a build-time default so both phones get it
+ * pre-filled without typing it in. Comes only from local.properties, which is
+ * gitignored — the key never touches the repository. Settings still lets the
+ * user override or clear it; this is a starting value, not a hardcoded fact.
+ */
+fun resolveDefaultAnthropicKey(): String = localProperties.getProperty("anthropic.api.key") ?: ""
+
 android {
     namespace = "com.gymapp.tracker"
     compileSdk = 35
@@ -32,8 +40,8 @@ android {
         applicationId = "com.gymapp.tracker"
         minSdk = 26
         targetSdk = 35
-        versionCode = 5
-        versionName = "1.4.0"
+        versionCode = 6
+        versionName = "1.5.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
@@ -44,12 +52,14 @@ android {
             applicationIdSuffix = ".debug"
             isDebuggable = true
             buildConfigField("String", "API_BASE_URL", "\"${resolveApiUrl("http://10.0.2.2:3000/")}\"")
+            buildConfigField("String", "DEFAULT_ANTHROPIC_KEY", "\"${resolveDefaultAnthropicKey()}\"")
         }
         release {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             buildConfigField("String", "API_BASE_URL", "\"${resolveApiUrl("https://dein-server.example/")}\"")
+            buildConfigField("String", "DEFAULT_ANTHROPIC_KEY", "\"${resolveDefaultAnthropicKey()}\"")
 
             // A debug-signed release build is enough to install an APK by hand.
             // Replace with a real keystore before distributing.

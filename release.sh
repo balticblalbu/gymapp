@@ -25,7 +25,14 @@ export ANDROID_HOME="$TOOLCHAIN_DIR/android-sdk"
 GRADLE_BIN="$(find "$TOOLCHAIN_DIR" -maxdepth 2 -type d -name "gradle-*" | head -1)/bin/gradle"
 export PATH="$JAVA_HOME/bin:$(dirname "$GRADLE_BIN"):$PATH"
 
-echo "sdk.dir=$ANDROID_HOME" > android/local.properties
+# sdk.dir muss bei jedem Lauf aktuell sein (Toolchain-Pfad wechselt pro
+# Sitzung); den Rest der Datei (z.B. den voreingestellten API-Key) unangetastet
+# lassen statt die ganze Datei zu überschreiben.
+if [ -f android/local.properties ]; then
+  grep -v '^sdk\.dir=' android/local.properties > android/local.properties.tmp || true
+  mv android/local.properties.tmp android/local.properties
+fi
+echo "sdk.dir=$ANDROID_HOME" >> android/local.properties
 
 # versionCode/versionName in build.gradle.kts hochziehen
 sed -i -E "s/versionCode = [0-9]+/versionCode = $CODE/" android/app/build.gradle.kts
