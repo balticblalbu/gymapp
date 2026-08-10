@@ -44,9 +44,9 @@ class TokenStore(context: Context) {
         set(value) = prefs.edit().putString(KEY_NAME, value).apply()
 
     /**
-     * Where the app looks for a newer build. Defaults to this project's GitHub
-     * releases: "latest" is a permanent redirect to the newest release, so the
-     * address never has to change again. Editable in the settings.
+     * Where the app looks for a newer build. Defaults to the update server on
+     * the home PC (serve-updates.sh) — no account and no token needed. Change
+     * it in the settings if the PC's address changes or you host it elsewhere.
      */
     var updateUrl: String
         get() = prefs.getString(KEY_UPDATE_URL, DEFAULT_UPDATE_URL) ?: DEFAULT_UPDATE_URL
@@ -65,6 +65,6 @@ class TokenStore(context: Context) {
         const val KEY_UPDATE_URL = "update_url"
         const val DEFAULT_MODEL = "claude-opus-5"
         const val DEFAULT_UPDATE_URL =
-            "https://github.com/jpaetrow-dotcom/gymapp/releases/latest/download/update.json"
+            "http://10.50.184.28:8080/update.json"
     }
 }

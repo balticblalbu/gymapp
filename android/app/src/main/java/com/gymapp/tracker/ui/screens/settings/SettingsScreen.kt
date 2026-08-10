@@ -11,6 +11,7 @@ import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -114,6 +115,11 @@ class SettingsViewModel(private val container: AppContainer) : ViewModel() {
         )
     }
 
+    /** Throws away unsaved edits, restoring the key that is actually stored. */
+    fun discardApiKeyDraft() {
+        _state.value = _state.value.copy(apiKey = container.settings.apiKey.orEmpty())
+    }
+
     fun onModelChange(value: String) {
         container.settings.model = value
         _state.value = _state.value.copy(model = value)
@@ -147,6 +153,13 @@ class SettingsViewModel(private val container: AppContainer) : ViewModel() {
     fun clearMessage() { _state.value = _state.value.copy(message = null, error = null) }
 }
 
+/** "sk-ant-api03-…kD9x" — enough to recognise the key, not enough to use it. */
+private fun maskedKey(key: String): String = when {
+    key.isBlank() -> "Kein Key hinterlegt"
+    key.length <= 12 -> "•••• gespeichert"
+    else -> "${key.take(10)}…${key.takeLast(4)} · gespeichert"
+}
+
 private fun shareFile(context: Context, file: File, format: String) {
     val uri = androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
     val intent = Intent(Intent.ACTION_SEND).apply {
@@ -167,6 +180,9 @@ fun SettingsScreen(
     val context = LocalContext.current
     var confirmDelete by remember { mutableStateOf(false) }
     var keyVisible by remember { mutableStateOf(false) }
+    // Collapsed by default once a key is saved, so opening Profil never shows
+    // (or half-shows) the key. Starts expanded only when there is none yet.
+    var editingKey by rememberSaveable(state.hasApiKey) { mutableStateOf(!state.hasApiKey) }
     var nameDraft by remember(state.user?.name) { mutableStateOf(state.user?.name ?: "") }
 
     LaunchedEffect(state.message, state.error) {
@@ -207,25 +223,57 @@ fun SettingsScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Spacer(Modifier.height(12.dp))
-                OutlinedTextField(
-                    value = state.apiKey,
-                    onValueChange = viewModel::onApiKeyChange,
-                    label = { Text("sk-ant-…") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    visualTransformation = if (keyVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                    trailingIcon = {
-                        IconButton(onClick = { keyVisible = !keyVisible }) {
-                            Icon(
-                                if (keyVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                                contentDescription = if (keyVisible) "Key verbergen" else "Key anzeigen",
-                            )
+
+                if (!editingKey) {
+                    // Collapsed: no key material on screen at all, just the
+                    // fact that one is stored and a way to change it.
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            maskedKey(state.apiKey),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        TextButton(onClick = {
+                            keyVisible = false
+                            editingKey = true
+                        }) { Text("Ändern") }
+                    }
+                } else {
+                    OutlinedTextField(
+                        value = state.apiKey,
+                        onValueChange = viewModel::onApiKeyChange,
+                        label = { Text("sk-ant-…") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        visualTransformation = if (keyVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                        trailingIcon = {
+                            IconButton(onClick = { keyVisible = !keyVisible }) {
+                                Icon(
+                                    if (keyVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                    contentDescription = if (keyVisible) "Key verbergen" else "Key anzeigen",
+                                )
+                            }
+                        },
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(onClick = {
+                            viewModel.saveApiKey()
+                            editingKey = false
+                        }) { Text("Key speichern") }
+                        if (state.hasApiKey) {
+                            TextButton(onClick = {
+                                viewModel.discardApiKeyDraft()
+                                editingKey = false
+                            }) { Text("Abbrechen") }
                         }
-                    },
-                )
-                Spacer(Modifier.height(10.dp))
-                Button(onClick = viewModel::saveApiKey) { Text("Key speichern") }
+                    }
+                }
 
                 Spacer(Modifier.height(16.dp))
                 SectionLabel("Modell")

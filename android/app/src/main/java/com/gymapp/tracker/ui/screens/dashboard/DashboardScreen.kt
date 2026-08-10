@@ -139,7 +139,7 @@ fun DashboardScreen(
                         Text("Heute noch kein Training erfasst", style = MaterialTheme.typography.bodyLarge)
                         Spacer(Modifier.height(4.dp))
                         Text(
-                            "Starte ein Training oder diktiere es einfach dem Telegram-Bot.",
+                            "Tippe unten rechts auf das Mikrofon und sag einfach, was du trainiert hast.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )

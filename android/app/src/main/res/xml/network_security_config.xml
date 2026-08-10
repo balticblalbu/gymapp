@@ -1,17 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
-    <!-- Produktion: ausschließlich HTTPS. -->
-    <base-config cleartextTrafficPermitted="false">
+    <!--
+      Klartext-HTTP ist erlaubt, weil der Update-Server im Heimnetz per HTTP
+      läuft (ein lokales HTTPS-Zertifikat wäre hier unverhältnismäßig).
+      Die Anfragen an Claude gehen unabhängig davon immer über HTTPS – die
+      Adresse ist im Code fest verdrahtet und nicht konfigurierbar.
+    -->
+    <base-config cleartextTrafficPermitted="true">
         <trust-anchors>
             <certificates src="system" />
         </trust-anchors>
     </base-config>
-
-    <!-- Entwicklung: Klartext nur zum lokalen Backend (10.0.2.2 = Host im Emulator). -->
-    <domain-config cleartextTrafficPermitted="true">
-        <domain includeSubdomains="true">10.0.2.2</domain>
-        <domain includeSubdomains="true">localhost</domain>
-        <domain includeSubdomains="true">127.0.0.1</domain>
-        <domain includeSubdomains="true">192.168.0.0</domain>
-    </domain-config>
 </network-security-config>

@@ -20,6 +20,8 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Mic
@@ -31,7 +33,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
@@ -133,6 +138,16 @@ fun VoiceSheet(
     val state by viewModel.state.collectAsState()
     val context = LocalContext.current
     val imeVisible = WindowInsets.isImeVisible
+    val keyboardController = LocalSoftwareKeyboardController.current
+    val focusManager = LocalFocusManager.current
+
+    // Sends and closes the keyboard together, so the reply card underneath
+    // the field becomes visible instead of staying hidden behind it.
+    fun sendAndHideKeyboard(spoken: Boolean) {
+        keyboardController?.hide()
+        focusManager.clearFocus()
+        viewModel.send(spoken)
+    }
     var hasPermission by remember {
         mutableStateOf(
             ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
@@ -220,9 +235,13 @@ fun VoiceSheet(
                 label = { Text("… oder tippen") },
                 modifier = Modifier.fillMaxWidth(),
                 minLines = 2,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                keyboardActions = KeyboardActions(
+                    onSend = { if (state.text.isNotBlank() && !state.sending) sendAndHideKeyboard(spoken = false) },
+                ),
                 trailingIcon = {
                     IconButton(
-                        onClick = { viewModel.send(spoken = false) },
+                        onClick = { sendAndHideKeyboard(spoken = false) },
                         enabled = state.text.isNotBlank() && !state.sending,
                     ) {
                         Icon(Icons.Default.Send, contentDescription = "Senden")

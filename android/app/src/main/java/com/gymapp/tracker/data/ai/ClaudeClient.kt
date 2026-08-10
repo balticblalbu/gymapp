@@ -198,9 +198,10 @@ private val WORKOUT_SCHEMA: JsonElement = buildJsonObject {
             }
         }
         putJsonObject("confidence") {
+            // Numerical constraints (minimum/maximum/multipleOf) are not
+            // supported by structured outputs and make the request fail.
+            // The range is stated in the prompt instead and clamped locally.
             put("type", "number")
-            put("minimum", 0)
-            put("maximum", 1)
         }
         putJsonObject("clarificationQuestion") {
             putJsonArray("type") {

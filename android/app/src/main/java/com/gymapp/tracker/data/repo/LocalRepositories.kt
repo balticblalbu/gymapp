@@ -917,7 +917,9 @@ class AiRepository(
         val candidates = exercises.candidates()
         val known = candidates.map { it.nameDe ?: it.name }
 
-        val parsed: ParsedMessage = claude.parseWorkout(text, known, today)
+        val raw: ParsedMessage = claude.parseWorkout(text, known, today)
+        // The schema can no longer enforce the 0..1 range, so clamp it here.
+        val parsed = raw.copy(confidence = raw.confidence.coerceIn(0.0, 1.0))
         val resolution: DateResolution = resolveDateExpression(parsed.dateExpression, today)
 
         if (resolution.ambiguous) {
