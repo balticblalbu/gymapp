@@ -9,7 +9,7 @@ Die App holt sich Updates selbst — du musst nie wieder eine APK aufs Handy kop
 2. In der App ist die Adresse bereits voreingestellt (Profil → App-Update):
 
    ```
-   https://github.com/jpaetrow-dotcom/gymapp/releases/latest/download/update.json
+   https://github.com/balticblalbu/gymapp/releases/latest/download/update.json
    ```
 
    `latest` ist eine dauerhafte Weiterleitung auf das neueste Release — die Adresse
