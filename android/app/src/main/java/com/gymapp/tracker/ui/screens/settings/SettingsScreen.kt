@@ -24,6 +24,7 @@ import androidx.lifecycle.viewModelScope
 import com.gymapp.tracker.AppContainer
 import com.gymapp.tracker.data.remote.UpdateUserRequest
 import com.gymapp.tracker.data.remote.UserDto
+import com.gymapp.tracker.ui.components.DraggableSectionList
 import com.gymapp.tracker.ui.components.PeriodSelector
 import com.gymapp.tracker.ui.components.SectionCard
 import com.gymapp.tracker.ui.components.SectionLabel
@@ -37,6 +38,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 
+/** Stable keys for the draggable Profil cards, persisted as their order. */
+private val ALL_SECTIONS = listOf("claude", "display", "update", "data")
+
 data class SettingsUiState(
     val user: UserDto? = null,
     val updateUrl: String = "",
@@ -49,13 +53,19 @@ data class SettingsUiState(
     val model: String = "claude-opus-5",
     val message: String? = null,
     val error: String? = null,
+    val sectionOrder: List<String> = ALL_SECTIONS,
 )
 
 class SettingsViewModel(private val container: AppContainer) : ViewModel() {
     private val _state = MutableStateFlow(SettingsUiState())
     val state: StateFlow<SettingsUiState> = _state.asStateFlow()
 
-    init { load() }
+    init {
+        val saved = container.settings.settingsOrder.split(",").filter { it.isNotBlank() }
+        val withNewKeys = saved + ALL_SECTIONS.filterNot { it in saved }
+        _state.value = _state.value.copy(sectionOrder = withNewKeys)
+        load()
+    }
 
     fun load() {
         _state.value = _state.value.copy(
@@ -66,6 +76,12 @@ class SettingsViewModel(private val container: AppContainer) : ViewModel() {
             updateUrl = container.settings.updateUrl,
             currentVersion = container.updater.currentVersion,
         )
+    }
+
+    fun reorderSections(newOrder: List<String>) {
+        check(newOrder.toSet() == ALL_SECTIONS.toSet()) { "Reorder must not lose or invent section keys" }
+        _state.value = _state.value.copy(sectionOrder = newOrder)
+        container.settings.settingsOrder = newOrder.joinToString(",")
     }
 
     fun onUpdateUrlChange(value: String) {
@@ -199,22 +215,120 @@ fun SettingsScreen(
     ) {
         item { Text("Profil", style = MaterialTheme.typography.headlineMedium) }
 
-        // --- Claude --------------------------------------------------------
+        // --- Verschiebbare Karten --------------------------------------------
         item {
-            SectionCard(accent = !state.hasApiKey) {
-                Row(
-                    Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    SectionLabel("Claude API", accent = !state.hasApiKey)
-                    Text(
-                        if (state.hasApiKey) "Aktiv" else "Kein Key",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = if (state.hasApiKey) AppTheme.colors.positive
-                        else MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+            DraggableSectionList(
+                items = state.sectionOrder,
+                key = { it },
+                onReorder = viewModel::reorderSections,
+                modifier = Modifier.fillMaxWidth(),
+            ) { sectionKey, dragHandle ->
+                Box(Modifier.padding(bottom = 12.dp)) {
+                    when (sectionKey) {
+                        "claude" -> ClaudeSection(
+                            state = state,
+                            viewModel = viewModel,
+                            dragHandle = dragHandle,
+                            editingKey = editingKey,
+                            onEditingKeyChange = { editingKey = it },
+                            keyVisible = keyVisible,
+                            onKeyVisibleChange = { keyVisible = it },
+                        )
+                        "display" -> DisplaySection(
+                            state = state,
+                            viewModel = viewModel,
+                            dragHandle = dragHandle,
+                            themeMode = themeMode,
+                            onThemeChange = onThemeChange,
+                            nameDraft = nameDraft,
+                            onNameDraftChange = { nameDraft = it },
+                        )
+                        "update" -> UpdateSection(state = state, viewModel = viewModel, dragHandle = dragHandle)
+                        "data" -> DataSection(
+                            viewModel = viewModel,
+                            dragHandle = dragHandle,
+                            context = context,
+                            onDeleteRequested = { confirmDelete = true },
+                        )
+                    }
                 }
+            }
+        }
+
+        item {
+            Text(
+                "Workout Tracker · Version ${com.gymapp.tracker.BuildConfig.VERSION_NAME}\n" +
+                    "Läuft vollständig auf dem Gerät – nur die Auswertung fragt Claude.",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 8.dp),
+            )
+        }
+
+        item { Spacer(Modifier.height(80.dp)) }
+    }
+
+    if (confirmDelete) {
+        AlertDialog(
+            onDismissRequest = { confirmDelete = false },
+            title = { Text("Wirklich alles löschen?") },
+            text = {
+                Text(
+                    "Alle Trainings und Rekorde werden unwiderruflich gelöscht. Der Übungskatalog " +
+                        "bleibt erhalten. Exportiere vorher, wenn du die Daten behalten willst.",
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmDelete = false
+                    viewModel.deleteEverything()
+                }) { Text("Endgültig löschen", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("Abbrechen") } },
+        )
+    }
+}
+
+@Composable
+private fun CardHeader(label: String, accent: Boolean = false, dragHandle: @Composable () -> Unit, trailing: (@Composable () -> Unit)? = null) {
+    Row(
+        Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            dragHandle()
+            Spacer(Modifier.width(4.dp))
+            SectionLabel(label, accent = accent)
+        }
+        trailing?.invoke()
+    }
+}
+
+@Composable
+private fun ClaudeSection(
+    state: SettingsUiState,
+    viewModel: SettingsViewModel,
+    dragHandle: @Composable () -> Unit,
+    editingKey: Boolean,
+    onEditingKeyChange: (Boolean) -> Unit,
+    keyVisible: Boolean,
+    onKeyVisibleChange: (Boolean) -> Unit,
+) {
+            SectionCard(accent = !state.hasApiKey) {
+                CardHeader(
+                    "Claude API",
+                    accent = !state.hasApiKey,
+                    dragHandle = dragHandle,
+                    trailing = {
+                        Text(
+                            if (state.hasApiKey) "Aktiv" else "Kein Key",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = if (state.hasApiKey) AppTheme.colors.positive
+                            else MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    },
+                )
                 Spacer(Modifier.height(8.dp))
                 Text(
                     "Der Key liegt verschlüsselt auf diesem Gerät und geht nur an die Anthropic-API. " +
@@ -238,8 +352,8 @@ fun SettingsScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         TextButton(onClick = {
-                            keyVisible = false
-                            editingKey = true
+                            onKeyVisibleChange(false)
+                            onEditingKeyChange(true)
                         }) { Text("Ändern") }
                     }
                 } else {
@@ -252,7 +366,7 @@ fun SettingsScreen(
                         visualTransformation = if (keyVisible) VisualTransformation.None else PasswordVisualTransformation(),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                         trailingIcon = {
-                            IconButton(onClick = { keyVisible = !keyVisible }) {
+                            IconButton(onClick = { onKeyVisibleChange(!keyVisible) }) {
                                 Icon(
                                     if (keyVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
                                     contentDescription = if (keyVisible) "Key verbergen" else "Key anzeigen",
@@ -264,12 +378,12 @@ fun SettingsScreen(
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Button(onClick = {
                             viewModel.saveApiKey()
-                            editingKey = false
+                            onEditingKeyChange(false)
                         }) { Text("Key speichern") }
                         if (state.hasApiKey) {
                             TextButton(onClick = {
                                 viewModel.discardApiKeyDraft()
-                                editingKey = false
+                                onEditingKeyChange(false)
                             }) { Text("Abbrechen") }
                         }
                     }
@@ -294,16 +408,24 @@ fun SettingsScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-        }
+}
 
-        // --- Anzeige --------------------------------------------------------
-        item {
+@Composable
+private fun DisplaySection(
+    state: SettingsUiState,
+    viewModel: SettingsViewModel,
+    dragHandle: @Composable () -> Unit,
+    themeMode: ThemeMode,
+    onThemeChange: (ThemeMode) -> Unit,
+    nameDraft: String,
+    onNameDraftChange: (String) -> Unit,
+) {
             SectionCard {
-                SectionLabel("Anzeige")
+                CardHeader("Anzeige", dragHandle = dragHandle)
                 Spacer(Modifier.height(10.dp))
                 OutlinedTextField(
                     value = nameDraft,
-                    onValueChange = { nameDraft = it },
+                    onValueChange = onNameDraftChange,
                     label = { Text("Name") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
@@ -336,23 +458,22 @@ fun SettingsScreen(
                     onSelect = { viewModel.updateUser(UpdateUserRequest(unitSystem = it)) },
                 )
             }
-        }
+}
 
-        // --- Update -----------------------------------------------------------
-        item {
+@Composable
+private fun UpdateSection(state: SettingsUiState, viewModel: SettingsViewModel, dragHandle: @Composable () -> Unit) {
             SectionCard {
-                Row(
-                    Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    SectionLabel("App-Update")
-                    Text(
-                        state.currentVersion,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
+                CardHeader(
+                    "App-Update",
+                    dragHandle = dragHandle,
+                    trailing = {
+                        Text(
+                            state.currentVersion,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    },
+                )
                 Spacer(Modifier.height(8.dp))
                 Text(
                     "Adresse einer JSON-Datei mit Versionsinfo oder direkt einer .apk. " +
@@ -400,12 +521,17 @@ fun SettingsScreen(
                     )
                 }
             }
-        }
+}
 
-        // --- Daten ----------------------------------------------------------
-        item {
+@Composable
+private fun DataSection(
+    viewModel: SettingsViewModel,
+    dragHandle: @Composable () -> Unit,
+    context: Context,
+    onDeleteRequested: () -> Unit,
+) {
             SectionCard {
-                SectionLabel("Daten")
+                CardHeader("Daten", dragHandle = dragHandle)
                 Spacer(Modifier.height(8.dp))
                 Text(
                     "Deine Trainings liegen ausschließlich auf diesem Gerät. Exportiere sie " +
@@ -423,42 +549,8 @@ fun SettingsScreen(
                     }
                 }
                 Spacer(Modifier.height(12.dp))
-                TextButton(onClick = { confirmDelete = true }, modifier = Modifier.fillMaxWidth()) {
+                TextButton(onClick = onDeleteRequested, modifier = Modifier.fillMaxWidth()) {
                     Text("Alle Trainingsdaten löschen", color = MaterialTheme.colorScheme.error)
                 }
             }
-        }
-
-        item {
-            Text(
-                "Workout Tracker · Version ${com.gymapp.tracker.BuildConfig.VERSION_NAME}\n" +
-                    "Läuft vollständig auf dem Gerät – nur die Auswertung fragt Claude.",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 8.dp),
-            )
-        }
-
-        item { Spacer(Modifier.height(80.dp)) }
-    }
-
-    if (confirmDelete) {
-        AlertDialog(
-            onDismissRequest = { confirmDelete = false },
-            title = { Text("Wirklich alles löschen?") },
-            text = {
-                Text(
-                    "Alle Trainings und Rekorde werden unwiderruflich gelöscht. Der Übungskatalog " +
-                        "bleibt erhalten. Exportiere vorher, wenn du die Daten behalten willst.",
-                )
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    confirmDelete = false
-                    viewModel.deleteEverything()
-                }) { Text("Endgültig löschen", color = MaterialTheme.colorScheme.error) }
-            },
-            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("Abbrechen") } },
-        )
-    }
 }
