@@ -2,6 +2,8 @@ package com.gymapp.tracker.data.local
 
 import android.content.Context
 import androidx.room.*
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -364,7 +366,7 @@ interface AiLogDao {
         PersonalRecordEntity::class,
         AiLogEntity::class,
     ],
-    version = 1,
+    version = 2,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -376,8 +378,25 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun aiLogDao(): AiLogDao
 
     companion object {
+        /**
+         * Adds `personal_records.source`, needed to tell manually entered
+         * records apart from ones derived from logged sets. An explicit
+         * migration — not [fallbackToDestructiveMigration] — because by the
+         * time this shipped, real training history already existed on both
+         * phones; dropping and recreating the tables would have deleted it.
+         */
+        private val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE personal_records ADD COLUMN source TEXT NOT NULL DEFAULT 'AUTO'")
+            }
+        }
+
         fun create(context: Context): AppDatabase =
             Room.databaseBuilder(context, AppDatabase::class.java, "gymapp.db")
+                .addMigrations(MIGRATION_1_2)
+                // Only a safety net for a future version jump that ships
+                // without its own migration — MIGRATION_1_2 above is what
+                // actually runs for this upgrade.
                 .fallbackToDestructiveMigration()
                 .build()
     }
