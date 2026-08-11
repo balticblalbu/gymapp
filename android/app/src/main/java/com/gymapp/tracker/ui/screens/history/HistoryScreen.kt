@@ -105,6 +105,9 @@ class HistoryViewModel(private val container: AppContainer) : ViewModel() {
                         offline = result.fromCache,
                         error = null,
                     )
+                    // Only the unfiltered list is the complete set; merging a
+                    // filtered subset would drop everything it leaves out.
+                    if (_state.value.filter == null) mergeOrder(result.value.map { it.id })
                 },
                 onFailure = { _state.value = _state.value.copy(loading = false, error = it.message) },
             )
@@ -164,7 +167,12 @@ fun HistoryScreen(
         // --- Kalender und Trainings -----------------------------------------
         if (state.isReorderable) {
             val byId = state.workouts.associateBy { it.id }
-            val sections = state.order.filter { it == CALENDAR_SECTION || it in byId }
+            // Built from what is actually there, then sorted by the saved
+            // order — never the other way round, or a workout the order has
+            // not caught up with yet would silently disappear.
+            val rank = state.order.withIndex().associate { (position, key) -> key to position }
+            val sections = (listOf(CALENDAR_SECTION) + state.workouts.map { it.id })
+                .sortedBy { rank[it] ?: Int.MAX_VALUE }
             item {
                 DraggableSectionList(
                     items = sections,
