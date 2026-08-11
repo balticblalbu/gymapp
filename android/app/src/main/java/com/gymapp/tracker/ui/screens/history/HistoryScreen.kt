@@ -31,6 +31,9 @@ import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.YearMonth
 
+/** The calendar rides along in the drag order as if it were a workout card. */
+private const val CALENDAR_SECTION = "calendar"
+
 data class HistoryUiState(
     val workouts: List<WorkoutDto> = emptyList(),
     val calendar: List<CalendarDayDto> = emptyList(),
@@ -66,9 +69,13 @@ class HistoryViewModel(private val container: AppContainer) : ViewModel() {
     }
 
     /** Keeps the saved order valid as workouts are added or deleted. */
-    private fun mergeOrder(allIds: List<String>) {
-        val saved = container.settings.historyOrder.split(",").filter { it.isNotBlank() }
-        val merged = saved.filter { it in allIds } + allIds.filterNot { it in saved }
+    private fun mergeOrder(workoutIds: List<String>) {
+        val available = listOf(CALENDAR_SECTION) + workoutIds
+        val saved = container.settings.historyOrder.split(",")
+            .filter { it.isNotBlank() && it in available }
+        // Whatever has no place yet joins at the top: a workout that just
+        // appeared is the newest one, and the calendar starts above the list.
+        val merged = available.filterNot { it in saved } + saved
         if (merged != _state.value.order) _state.value = _state.value.copy(order = merged)
     }
 
@@ -141,43 +148,6 @@ fun HistoryScreen(
             Text("Verlauf", style = MaterialTheme.typography.headlineMedium)
         }
 
-        // --- Kalender ------------------------------------------------------
-        item {
-            SectionCard {
-                Row(
-                    Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    TextButton(onClick = { viewModel.changeMonth(-1) }) { Text("‹") }
-                    Text(
-                        "${monthName(state.month.monthValue)} ${state.month.year}",
-                        style = MaterialTheme.typography.titleMedium,
-                    )
-                    TextButton(onClick = { viewModel.changeMonth(1) }) { Text("›") }
-                }
-                Spacer(Modifier.height(8.dp))
-                CalendarGrid(
-                    month = state.month,
-                    days = state.calendar,
-                    onSelect = { day -> onOpenWorkout(day.workoutId) },
-                )
-                Spacer(Modifier.height(10.dp))
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text(
-                        "Markiert = Training · Punkt = Rekord",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Text(
-                        "${state.calendar.size} Trainings",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-        }
-
         // --- Filter --------------------------------------------------------
         item {
             PeriodSelector(
@@ -191,29 +161,46 @@ fun HistoryScreen(
         state.error?.let { item { StatusBanner(it, isError = true, onAction = viewModel::load, actionLabel = "Erneut") } }
         if (state.loading && state.workouts.isEmpty()) item { LoadingBox() }
 
-        // --- Trainings ------------------------------------------------------
+        // --- Kalender und Trainings -----------------------------------------
         if (state.isReorderable) {
-            val rank = state.order.withIndex().associate { (position, id) -> id to position }
-            val ordered = state.workouts.sortedBy { rank[it.id] ?: Int.MAX_VALUE }
+            val byId = state.workouts.associateBy { it.id }
+            val sections = state.order.filter { it == CALENDAR_SECTION || it in byId }
             item {
                 DraggableSectionList(
-                    items = ordered,
-                    key = { it.id },
-                    onReorder = { moved -> viewModel.reorder(moved.map { it.id }) },
+                    items = sections,
+                    key = { it },
+                    onReorder = viewModel::reorder,
                     modifier = Modifier.fillMaxWidth(),
                     scroller = scroller,
-                ) { workout ->
+                ) { section ->
                     Box(Modifier.padding(bottom = 12.dp)) {
-                        WorkoutCard(
-                            workout = workout,
-                            onOpenWorkout = onOpenWorkout,
-                            onOpenExercise = onOpenExercise,
-                            onDelete = { pendingDelete = workout },
-                        )
+                        if (section == CALENDAR_SECTION) {
+                            CalendarCard(
+                                state = state,
+                                onChangeMonth = viewModel::changeMonth,
+                                onOpenWorkout = onOpenWorkout,
+                            )
+                        } else {
+                            byId[section]?.let { workout ->
+                                WorkoutCard(
+                                    workout = workout,
+                                    onOpenWorkout = onOpenWorkout,
+                                    onOpenExercise = onOpenExercise,
+                                    onDelete = { pendingDelete = workout },
+                                )
+                            }
+                        }
                     }
                 }
             }
         } else {
+            item {
+                CalendarCard(
+                    state = state,
+                    onChangeMonth = viewModel::changeMonth,
+                    onOpenWorkout = onOpenWorkout,
+                )
+            }
             items(state.workouts, key = { it.id }) { workout ->
                 WorkoutCard(
                     workout = workout,
@@ -243,6 +230,47 @@ fun HistoryScreen(
             },
             dismissButton = { TextButton(onClick = { pendingDelete = null }) { Text("Abbrechen") } },
         )
+    }
+}
+
+@Composable
+private fun CalendarCard(
+    state: HistoryUiState,
+    onChangeMonth: (Long) -> Unit,
+    onOpenWorkout: (String) -> Unit,
+) {
+    SectionCard {
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            TextButton(onClick = { onChangeMonth(-1) }) { Text("‹") }
+            Text(
+                "${monthName(state.month.monthValue)} ${state.month.year}",
+                style = MaterialTheme.typography.titleMedium,
+            )
+            TextButton(onClick = { onChangeMonth(1) }) { Text("›") }
+        }
+        Spacer(Modifier.height(8.dp))
+        CalendarGrid(
+            month = state.month,
+            days = state.calendar,
+            onSelect = { day -> onOpenWorkout(day.workoutId) },
+        )
+        Spacer(Modifier.height(10.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(
+                "Markiert = Training · Punkt = Rekord",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                "${state.calendar.size} Trainings",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }
 
