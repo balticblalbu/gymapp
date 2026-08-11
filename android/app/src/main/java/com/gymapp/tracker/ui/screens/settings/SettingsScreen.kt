@@ -87,12 +87,7 @@ class SettingsViewModel(private val container: AppContainer) : ViewModel() {
         container.settings.settingsOrder = newOrder.joinToString(",")
     }
 
-    fun onUpdateUrlChange(value: String) {
-        _state.value = _state.value.copy(updateUrl = value)
-    }
-
     fun checkForUpdate() {
-        container.settings.updateUrl = _state.value.updateUrl
         _state.value = _state.value.copy(checkingUpdate = true, updateStatus = null, updateAvailable = null)
         viewModelScope.launch {
             when (val result = container.updater.check(_state.value.updateUrl)) {
@@ -259,16 +254,6 @@ fun SettingsScreen(
                     }
                 }
             }
-        }
-
-        item {
-            Text(
-                "Workout Tracker · Version ${com.gymapp.tracker.BuildConfig.VERSION_NAME}\n" +
-                    "Läuft vollständig auf dem Gerät – nur die Auswertung fragt Claude.",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 8.dp),
-            )
         }
 
         item { Spacer(Modifier.height(80.dp)) }
@@ -466,15 +451,6 @@ private fun UpdateSection(state: SettingsUiState, viewModel: SettingsViewModel) 
                     },
                 )
                 Spacer(Modifier.height(12.dp))
-                OutlinedTextField(
-                    value = state.updateUrl,
-                    onValueChange = viewModel::onUpdateUrlChange,
-                    label = { Text("https://…/update.json") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
-                )
-                Spacer(Modifier.height(10.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(
                         onClick = viewModel::checkForUpdate,

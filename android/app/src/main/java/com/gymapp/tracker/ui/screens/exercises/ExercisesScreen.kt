@@ -35,7 +35,6 @@ data class ExercisesUiState(
     val query: String = "",
     val filter: String? = null,
     val loading: Boolean = true,
-    val offline: Boolean = false,
     val error: String? = null,
     /** Custom order (exercise ids) for the unfiltered catalogue, drag-reorderable. */
     val order: List<String> = emptyList(),
@@ -98,7 +97,6 @@ class ExercisesViewModel(private val container: AppContainer) : ViewModel() {
                     _state.value = _state.value.copy(
                         exercises = result.value,
                         loading = false,
-                        offline = result.fromCache,
                         error = null,
                     )
                 },
@@ -170,7 +168,6 @@ fun ExercisesScreen(viewModel: ExercisesViewModel, onOpenExercise: (String) -> U
                 )
             }
 
-            if (state.offline) item { StatusBanner("Offline – zeige gespeicherte Übungen") }
             state.error?.let { item { StatusBanner(it, isError = true, onAction = viewModel::load, actionLabel = "Erneut") } }
             if (state.loading && state.exercises.isEmpty()) item { LoadingBox() }
 

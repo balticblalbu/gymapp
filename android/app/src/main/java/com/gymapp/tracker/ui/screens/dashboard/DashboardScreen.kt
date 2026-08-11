@@ -34,9 +34,7 @@ private val ALL_SECTIONS = listOf("today", "records", "comparisons", "muscleGrou
 data class DashboardUiState(
     val dashboard: DashboardDto? = null,
     val loading: Boolean = true,
-    val offline: Boolean = false,
     val error: String? = null,
-    val pendingChanges: Int = 0,
     val sectionOrder: List<String> = ALL_SECTIONS,
 )
 
@@ -59,7 +57,6 @@ class DashboardViewModel(private val container: AppContainer) : ViewModel() {
                     _state.value = _state.value.copy(
                         dashboard = result.value,
                         loading = false,
-                        offline = result.fromCache,
                         error = null,
                     )
                 },
@@ -69,8 +66,6 @@ class DashboardViewModel(private val container: AppContainer) : ViewModel() {
             )
         }
     }
-
-    fun sync() = load()
 
     /**
      * Persists a new order for the cards that were visible and draggable.
@@ -130,18 +125,6 @@ fun DashboardScreen(
             }
         }
 
-        if (state.offline) {
-            item { StatusBanner("Offline – zeige gespeicherte Daten", onAction = viewModel::load, actionLabel = "Neu laden") }
-        }
-        if (state.pendingChanges > 0) {
-            item {
-                StatusBanner(
-                    "${state.pendingChanges} Änderungen warten auf Synchronisierung",
-                    onAction = viewModel::sync,
-                    actionLabel = "Jetzt senden",
-                )
-            }
-        }
         state.error?.let { error ->
             item { StatusBanner(error, isError = true, onAction = viewModel::load, actionLabel = "Erneut") }
         }

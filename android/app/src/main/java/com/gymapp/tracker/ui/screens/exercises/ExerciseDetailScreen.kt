@@ -306,14 +306,6 @@ fun ExerciseDetailScreen(viewModel: ExerciseDetailViewModel, onBack: () -> Unit)
                                 }
                             }
 
-                        if (data.hasMeasuredOneRm) {
-                            Spacer(Modifier.height(6.dp))
-                            Text(
-                                "Enthält einen echten 1RM-Versuch (nicht nur geschätzt).",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.primary,
-                            )
-                        }
                     }
                 }
 

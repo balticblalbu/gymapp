@@ -118,17 +118,6 @@ private fun MainScaffold(
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
-        floatingActionButton = {
-            if (showBottomBar) {
-                // The fastest way in: speak the workout, Claude structures it.
-                FloatingActionButton(
-                    onClick = { showVoice = true },
-                    containerColor = MaterialTheme.colorScheme.primary,
-                ) {
-                    Icon(Icons.Default.Mic, contentDescription = "Training diktieren")
-                }
-            }
-        },
         bottomBar = {
             if (showBottomBar) {
                 NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
@@ -147,6 +136,15 @@ private fun MainScaffold(
                             label = { Text(destination.label, style = MaterialTheme.typography.labelSmall) },
                         )
                     }
+                    // Not a destination but the fastest way in: speak the
+                    // workout, Claude structures it. Sits with the tabs rather
+                    // than floating over the content.
+                    NavigationBarItem(
+                        selected = false,
+                        onClick = { showVoice = true },
+                        icon = { Icon(Icons.Default.Mic, contentDescription = "Training diktieren") },
+                        label = { Text("Sprechen", style = MaterialTheme.typography.labelSmall) },
+                    )
                 }
             }
         },

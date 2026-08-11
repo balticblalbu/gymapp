@@ -41,7 +41,6 @@ data class HistoryUiState(
     val filter: String? = null,
     val month: YearMonth = YearMonth.now(),
     val loading: Boolean = true,
-    val offline: Boolean = false,
     val error: String? = null,
     /** Custom order (workout ids) for the unfiltered list, drag-reorderable. */
     val order: List<String> = emptyList(),
@@ -102,7 +101,6 @@ class HistoryViewModel(private val container: AppContainer) : ViewModel() {
                     _state.value = _state.value.copy(
                         workouts = result.value,
                         loading = false,
-                        offline = result.fromCache,
                         error = null,
                     )
                     // Only the unfiltered list is the complete set; merging a
@@ -160,7 +158,6 @@ fun HistoryScreen(
             )
         }
 
-        if (state.offline) item { StatusBanner("Offline – zeige gespeicherte Trainings") }
         state.error?.let { item { StatusBanner(it, isError = true, onAction = viewModel::load, actionLabel = "Erneut") } }
         if (state.loading && state.workouts.isEmpty()) item { LoadingBox() }
 
@@ -266,19 +263,6 @@ private fun CalendarCard(
             days = state.calendar,
             onSelect = { day -> onOpenWorkout(day.workoutId) },
         )
-        Spacer(Modifier.height(10.dp))
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(
-                "Markiert = Training · Punkt = Rekord",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Text(
-                "${state.calendar.size} Trainings",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
     }
 }
 
