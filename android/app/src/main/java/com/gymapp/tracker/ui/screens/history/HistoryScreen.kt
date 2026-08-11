@@ -235,7 +235,7 @@ fun HistoryScreen(
         }
 
         if (!state.loading && state.workouts.isEmpty()) {
-            item { EmptyState("Noch keine Trainings", "Erfasse dein erstes Training – oder diktiere es dem Telegram-Bot.") }
+            item { EmptyState("Noch keine Trainings") }
         }
         item { Spacer(Modifier.height(80.dp)) }
     }

@@ -191,7 +191,7 @@ fun ExercisesScreen(viewModel: ExercisesViewModel, onOpenExercise: (String) -> U
             }
 
             if (!state.loading && state.exercises.isEmpty()) {
-                item { EmptyState("Keine Übung gefunden", "Lege eine neue Übung an – oder diktiere sie dem Telegram-Bot.") }
+                item { EmptyState("Keine Übung gefunden") }
             }
             item { Spacer(Modifier.height(90.dp)) }
         }

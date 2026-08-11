@@ -322,8 +322,7 @@ private fun ClaudeSection(
                 )
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    "Der Key liegt verschlüsselt auf diesem Gerät und geht nur an die Anthropic-API. " +
-                        "Die Spracherkennung läuft auf dem Handy – es wird nie Audio übertragen.",
+                    "Verschlüsselt auf dem Gerät gespeichert, kein Audio wird übertragen.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -392,12 +391,6 @@ private fun ClaudeSection(
                     selected = state.model,
                     onSelect = viewModel::onModelChange,
                 )
-                Spacer(Modifier.height(6.dp))
-                Text(
-                    "Opus 5 versteht freie Formulierungen am besten; Sonnet und Haiku sind günstiger und schneller.",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
             }
 }
 
@@ -463,14 +456,6 @@ private fun UpdateSection(state: SettingsUiState, viewModel: SettingsViewModel) 
                         )
                     },
                 )
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    "Adresse einer JSON-Datei mit Versionsinfo oder direkt einer .apk. " +
-                        "Der Link muss die Datei sofort liefern – Filehoster mit Downloadseite " +
-                        "funktionieren nicht.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
                 Spacer(Modifier.height(12.dp))
                 OutlinedTextField(
                     value = state.updateUrl,
@@ -522,8 +507,7 @@ private fun DataSection(
                 CardHeader("Daten")
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    "Deine Trainings liegen ausschließlich auf diesem Gerät. Exportiere sie " +
-                        "regelmäßig – das ist deine einzige Sicherung.",
+                    "Nur auf diesem Gerät – exportieren ist deine einzige Sicherung.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

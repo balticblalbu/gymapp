@@ -245,7 +245,7 @@ fun ExerciseDetailScreen(viewModel: ExerciseDetailViewModel, onBack: () -> Unit)
 
                         if (state.data!!.records.isEmpty()) {
                             Text(
-                                "Noch keine Rekorde – trainiere diese Übung, oder trage einen früheren Bestwert nach.",
+                                "Noch keine Rekorde",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -318,7 +318,7 @@ fun ExerciseDetailScreen(viewModel: ExerciseDetailViewModel, onBack: () -> Unit)
                 }
 
                 if (data.series.isEmpty()) {
-                    item { EmptyState("Noch keine Daten", "Erfasse diese Übung im Training oder per Telegram.") }
+                    item { EmptyState("Noch keine Daten") }
                 }
             }
 

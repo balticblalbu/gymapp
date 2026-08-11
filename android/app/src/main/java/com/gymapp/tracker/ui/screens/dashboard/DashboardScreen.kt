@@ -215,14 +215,6 @@ private fun TodaySection(
         Spacer(Modifier.height(12.dp))
 
         if (!data.today.hasWorkout) {
-            Text("Heute noch kein Training erfasst", style = MaterialTheme.typography.bodyLarge)
-            Spacer(Modifier.height(4.dp))
-            Text(
-                "Tippe unten rechts auf das Mikrofon und sag einfach, was du trainiert hast.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(Modifier.height(14.dp))
             Button(onClick = onStartTraining) { Text("Training starten") }
         } else {
             data.today.exercises.forEachIndexed { index, exercise ->
@@ -342,12 +334,6 @@ private fun MuscleGroupsSection(data: DashboardDto) {
                 changePercent = group.changePercent,
             )
         }
-        Spacer(Modifier.height(6.dp))
-        Text(
-            "Vergleich je Übung mit sich selbst (Median), gewichtet nach Sätzen – Ausreißer verzerren den Trend nicht.",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
     }
 }
 

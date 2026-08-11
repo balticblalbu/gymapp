@@ -180,7 +180,6 @@ fun TrainingScreen(viewModel: TrainingViewModel, onFinished: () -> Unit) {
     if (workout == null || workout.status != "IN_PROGRESS") {
         EmptyState(
             title = "Kein aktives Training",
-            hint = "Starte ein neues Training – oder diktiere es dem Telegram-Bot und es erscheint automatisch hier.",
             modifier = Modifier.fillMaxSize().wrapContentHeight(Alignment.CenterVertically),
             action = { Button(onClick = viewModel::start) { Text("Training starten") } },
         )
