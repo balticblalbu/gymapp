@@ -74,6 +74,11 @@ class TokenStore(context: Context) {
         get() = prefs.getString(KEY_UNITS, "KG") ?: "KG"
         set(value) = prefs.edit().putString(KEY_UNITS, value).apply()
 
+    /** Order of the Dashboard's draggable cards, comma separated section keys. */
+    var dashboardOrder: String
+        get() = prefs.getString(KEY_DASHBOARD_ORDER, DEFAULT_DASHBOARD_ORDER) ?: DEFAULT_DASHBOARD_ORDER
+        set(value) = prefs.edit().putString(KEY_DASHBOARD_ORDER, value).apply()
+
     private companion object {
         const val FILE_NAME = "gymapp_secure_prefs"
         const val KEY_API = "anthropic_api_key"
@@ -83,8 +88,10 @@ class TokenStore(context: Context) {
         const val KEY_NAME = "display_name"
         const val KEY_UNITS = "unit_system"
         const val KEY_UPDATE_URL = "update_url"
+        const val KEY_DASHBOARD_ORDER = "dashboard_order"
         const val DEFAULT_MODEL = "claude-opus-5"
         const val DEFAULT_UPDATE_URL =
             "http://10.50.184.28:8080/update.json"
+        const val DEFAULT_DASHBOARD_ORDER = "today,records,comparisons,muscleGroups"
     }
 }

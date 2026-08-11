@@ -106,6 +106,12 @@ data class PersonalRecordEntity(
     val reps: Int? = null,
     /** ISO date of the workout that set the record. */
     val achievedAt: String,
+    /**
+     * "AUTO" = derived from logged sets by [recomputeRecords], replaced whenever
+     * that exercise's sets change. "MANUAL" = entered by hand (e.g. a PR from
+     * before the app was used) and never touched by recomputation.
+     */
+    val source: String = "AUTO",
 )
 
 /** Audit trail: what was said, what the model made of it, what was stored. */
@@ -320,8 +326,18 @@ interface PersonalRecordDao {
     @Query("DELETE FROM personal_records WHERE exerciseId = :exerciseId")
     suspend fun deleteForExercise(exerciseId: String)
 
+    /** Clears only computed records, so manually entered history survives a recompute. */
+    @Query("DELETE FROM personal_records WHERE exerciseId = :exerciseId AND source = 'AUTO'")
+    suspend fun deleteAutoForExercise(exerciseId: String)
+
+    @Query("DELETE FROM personal_records WHERE id = :id")
+    suspend fun deleteById(id: String)
+
     @Insert
     suspend fun insert(records: List<PersonalRecordEntity>)
+
+    @Insert
+    suspend fun insert(record: PersonalRecordEntity)
 
     @Query("DELETE FROM personal_records")
     suspend fun clear()

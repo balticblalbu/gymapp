@@ -102,7 +102,11 @@ class HistoryViewModel(private val container: AppContainer) : ViewModel() {
 }
 
 @Composable
-fun HistoryScreen(viewModel: HistoryViewModel, onOpenWorkout: (String) -> Unit) {
+fun HistoryScreen(
+    viewModel: HistoryViewModel,
+    onOpenWorkout: (String) -> Unit,
+    onOpenExercise: (String) -> Unit,
+) {
     val state by viewModel.state.collectAsState()
     var pendingDelete by remember { mutableStateOf<WorkoutDto?>(null) }
 
@@ -193,7 +197,10 @@ fun HistoryScreen(viewModel: HistoryViewModel, onOpenWorkout: (String) -> Unit) 
                     SectionLabel(muscleLabel(group), modifier = Modifier.padding(top = 6.dp, bottom = 2.dp))
                     exercises.forEach { exercise ->
                         Row(
-                            Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                            Modifier
+                                .fillMaxWidth()
+                                .clickable { onOpenExercise(exercise.exerciseId) }
+                                .padding(vertical = 4.dp),
                             horizontalArrangement = Arrangement.SpaceBetween,
                         ) {
                             Column(Modifier.weight(1f)) {

@@ -186,6 +186,7 @@ private fun MainScaffold(
                 HistoryScreen(
                     viewModel = viewModel { HistoryViewModel(container) },
                     onOpenWorkout = { navController.navigate(Destination.Training.route) },
+                    onOpenExercise = { navController.navigate("exerciseDetail/$it") },
                 )
             }
 

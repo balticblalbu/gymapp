@@ -252,15 +252,64 @@ class ExerciseRepository(private val db: AppDatabase) {
 
         val records = db.recordDao().forExercise(id).map {
             PersonalRecordDto(
+                id = it.id,
                 type = it.type,
                 value = it.value,
                 previousValue = it.previousValue,
                 weightKg = it.weightKg,
                 reps = it.reps,
                 achievedAt = it.achievedAt,
+                source = it.source,
             )
         }
         return ExerciseStatsResponse(stats = stats, records = records)
+    }
+
+    /**
+     * Adds a record entered by hand — e.g. a PR from before the app was used,
+     * or one that never got logged as a set. `previousValue` is derived from
+     * the exercise's own history at the chosen date, the same way an
+     * automatically detected record would report it.
+     */
+    suspend fun addManualRecord(
+        exerciseId: String,
+        type: String,
+        value: Double,
+        weightKg: Double?,
+        reps: Int?,
+        achievedAt: String,
+    ): PersonalRecordDto {
+        val previous = db.recordDao().forExercise(exerciseId)
+            .filter { it.type == type && it.achievedAt <= achievedAt }
+            .maxOfOrNull { it.value }
+
+        val entity = PersonalRecordEntity(
+            id = newId(),
+            exerciseId = exerciseId,
+            type = type,
+            value = round2(value),
+            previousValue = previous?.let { round2(it) },
+            weightKg = weightKg,
+            reps = reps,
+            achievedAt = achievedAt,
+            source = "MANUAL",
+        )
+        db.recordDao().insert(entity)
+        return PersonalRecordDto(
+            id = entity.id,
+            type = entity.type,
+            value = entity.value,
+            previousValue = entity.previousValue,
+            weightKg = entity.weightKg,
+            reps = entity.reps,
+            achievedAt = entity.achievedAt,
+            source = entity.source,
+        )
+    }
+
+    /** Only manual entries make sense to remove by hand — AUTO ones just get recomputed. */
+    suspend fun deleteRecord(id: String) {
+        db.recordDao().deleteById(id)
     }
 }
 
@@ -468,7 +517,9 @@ private suspend fun buildWorkoutDto(db: AppDatabase, entity: WorkoutEntity): Wor
  */
 suspend fun recomputeRecords(db: AppDatabase, exerciseId: String) {
     val rows = db.setDao().rowsForExercise(exerciseId).filterNot { it.isWarmup }
-    db.recordDao().deleteForExercise(exerciseId)
+    // Only the computed (AUTO) records are replaced — manually entered history
+    // for this exercise is left untouched.
+    db.recordDao().deleteAutoForExercise(exerciseId)
     if (rows.isEmpty()) return
 
     val records = mutableListOf<PersonalRecordEntity>()
@@ -535,9 +586,10 @@ suspend fun recomputeRecords(db: AppDatabase, exerciseId: String) {
         }
     }
 
-    // Only the newest record per type is interesting for the UI.
-    val newest = records.groupBy { it.type }.mapNotNull { (_, entries) -> entries.maxByOrNull { it.achievedAt } }
-    db.recordDao().insert(newest)
+    // Every crossed threshold is kept, not just the latest one per type – this
+    // is what lets the exercise page show a progression history instead of a
+    // single current best.
+    db.recordDao().insert(records)
 }
 
 // ---------------------------------------------------------------------------
@@ -702,6 +754,7 @@ class StatsRepository(private val db: AppDatabase) {
                 weightKg = record.weightKg,
                 reps = record.reps,
                 achievedAt = record.achievedAt,
+                source = record.source,
             )
         }
     }
@@ -711,6 +764,7 @@ class StatsRepository(private val db: AppDatabase) {
         return db.recordDao().all().sortedByDescending { it.achievedAt }.take(5).map { record ->
             val exercise = exercises[record.exerciseId]
             RecordSummaryDto(
+                exerciseId = record.exerciseId,
                 exerciseName = exercise?.nameDe?.takeIf { it.isNotBlank() } ?: exercise?.name ?: "Übung",
                 type = record.type,
                 value = record.value,

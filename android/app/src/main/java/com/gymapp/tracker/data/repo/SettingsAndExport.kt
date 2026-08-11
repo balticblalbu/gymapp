@@ -38,6 +38,10 @@ class SettingsRepository(private val prefs: TokenStore) {
     var updateUrl: String
         get() = prefs.updateUrl
         set(value) { prefs.updateUrl = value }
+
+    var dashboardOrder: String
+        get() = prefs.dashboardOrder
+        set(value) { prefs.dashboardOrder = value }
 }
 
 /** CSV and JSON export — the only backup path now that data lives on-device. */

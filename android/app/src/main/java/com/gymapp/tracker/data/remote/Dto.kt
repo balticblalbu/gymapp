@@ -260,6 +260,7 @@ data class MuscleGroupProgressDto(
 
 @Serializable
 data class RecordSummaryDto(
+    val exerciseId: String = "",
     val exerciseName: String,
     val type: String,
     val value: Double,
@@ -346,12 +347,15 @@ data class ExerciseStatsDto(
 
 @Serializable
 data class PersonalRecordDto(
+    val id: String = "",
     val type: String,
     val value: Double,
     val previousValue: Double? = null,
     val weightKg: Double? = null,
     val reps: Int? = null,
     val achievedAt: String,
+    /** "AUTO" (derived from logged sets) or "MANUAL" (entered by hand). */
+    val source: String = "AUTO",
 )
 
 @Serializable
@@ -371,6 +375,7 @@ data class RecordListItemDto(
     val weightKg: Double? = null,
     val reps: Int? = null,
     val achievedAt: String,
+    val source: String = "AUTO",
 )
 
 @Serializable

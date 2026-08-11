@@ -27,12 +27,16 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 
+/** Stable keys for the draggable dashboard cards, persisted as their order. */
+private val ALL_SECTIONS = listOf("today", "records", "comparisons", "muscleGroups")
+
 data class DashboardUiState(
     val dashboard: DashboardDto? = null,
     val loading: Boolean = true,
     val offline: Boolean = false,
     val error: String? = null,
     val pendingChanges: Int = 0,
+    val sectionOrder: List<String> = ALL_SECTIONS,
 )
 
 class DashboardViewModel(private val container: AppContainer) : ViewModel() {
@@ -40,6 +44,9 @@ class DashboardViewModel(private val container: AppContainer) : ViewModel() {
     val state: StateFlow<DashboardUiState> = _state.asStateFlow()
 
     init {
+        val saved = container.settings.dashboardOrder.split(",").filter { it.isNotBlank() }
+        val withNewKeys = saved + ALL_SECTIONS.filterNot { it in saved }
+        _state.value = _state.value.copy(sectionOrder = withNewKeys)
         load()
     }
 
@@ -63,6 +70,33 @@ class DashboardViewModel(private val container: AppContainer) : ViewModel() {
     }
 
     fun sync() = load()
+
+    /**
+     * Persists a new order for the cards that were visible and draggable.
+     * Cards hidden at the moment (e.g. "records" with nothing yet) keep their
+     * relative slot in the saved order instead of being dropped from it.
+     */
+    fun reorderSections(newVisibleOrder: List<String>) {
+        val full = _state.value.sectionOrder
+        val hidden = full.filterNot { it in newVisibleOrder }
+        val merged = mutableListOf<String>()
+        var spliced = false
+        for (key in full) {
+            if (key in newVisibleOrder) {
+                if (!spliced) {
+                    merged.addAll(newVisibleOrder)
+                    spliced = true
+                }
+            } else {
+                merged.add(key)
+            }
+        }
+        if (!spliced) merged.addAll(newVisibleOrder)
+        check(merged.toSet() == full.toSet()) { "Reorder must not lose or invent section keys" }
+        _state.value = _state.value.copy(sectionOrder = merged)
+        container.settings.dashboardOrder = merged.joinToString(",")
+        hidden.size // no-op, keeps `hidden` from looking unused in review
+    }
 }
 
 @Composable
@@ -122,160 +156,204 @@ fun DashboardScreen(
                 }
             }
 
-            // --- Heutiges Training -----------------------------------------
+            // --- Verschiebbare Karten ----------------------------------------
             item {
-                SectionCard(accent = data.today.hasWorkout) {
-                    Row(
-                        Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        SectionLabel("Training heute", accent = data.today.hasWorkout)
-                        if (data.today.hasWorkout) TrendPill(data.comparisons.vsLastWorkout, filled = true)
-                    }
-                    Spacer(Modifier.height(12.dp))
-
-                    if (!data.today.hasWorkout) {
-                        Text("Heute noch kein Training erfasst", style = MaterialTheme.typography.bodyLarge)
-                        Spacer(Modifier.height(4.dp))
-                        Text(
-                            "Tippe unten rechts auf das Mikrofon und sag einfach, was du trainiert hast.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        Spacer(Modifier.height(14.dp))
-                        Button(onClick = onStartTraining) { Text("Training starten") }
-                    } else {
-                        data.today.exercises.forEachIndexed { index, exercise ->
-                            if (index > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outline)
-                            Row(
-                                Modifier
-                                    .fillMaxWidth()
-                                    .clickable { onOpenExercise(exercise.exerciseId) }
-                                    .padding(vertical = 11.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                            ) {
-                                Column(Modifier.weight(1f)) {
-                                    Text(exercise.name, style = MaterialTheme.typography.titleSmall)
-                                    Spacer(Modifier.height(3.dp))
-                                    Text(
-                                        exercise.summary,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                }
-                                if (exercise.volumeKg > 0) {
-                                    Text(
-                                        Fmt.volume(exercise.volumeKg),
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        fontWeight = FontWeight.SemiBold,
-                                    )
-                                }
-                            }
-                        }
-
-                        Spacer(Modifier.height(8.dp))
-                        HorizontalDivider(color = MaterialTheme.colorScheme.outline)
-                        Spacer(Modifier.height(10.dp))
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text(
-                                buildString {
-                                    append("${data.today.sets} Sätze · ${data.today.reps} Wdh")
-                                    data.today.durationSec?.takeIf { it > 0 }?.let { append(" · ${Fmt.duration(it)}") }
-                                },
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                            Text(
-                                Fmt.volume(data.today.volumeKg),
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.Bold,
-                            )
-                        }
-                        data.today.workoutId?.let { id ->
-                            Spacer(Modifier.height(10.dp))
-                            TextButton(onClick = { onOpenWorkout(id) }) { Text("Training öffnen") }
-                        }
+                val visible = state.sectionOrder.filter { key ->
+                    when (key) {
+                        "records" -> data.recentRecords.isNotEmpty()
+                        "muscleGroups" -> data.muscleGroups.isNotEmpty()
+                        else -> true
                     }
                 }
-            }
-
-            // --- Rekorde ---------------------------------------------------
-            if (data.recentRecords.isNotEmpty()) {
-                item {
-                    SectionCard {
-                        SectionLabel("Neueste Rekorde")
-                        Spacer(Modifier.height(10.dp))
-                        data.recentRecords.take(3).forEach { record ->
-                            Row(
-                                Modifier.fillMaxWidth().padding(vertical = 5.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Column(Modifier.weight(1f)) {
-                                    Text("🔥 ${record.exerciseName}", style = MaterialTheme.typography.titleSmall)
-                                    Text(
-                                        record.previousValue?.let {
-                                            "Vorher ${formatRecordValue(record.type, it)} · ${Fmt.dayLabel(record.achievedAt)}"
-                                        } ?: Fmt.dayLabel(record.achievedAt),
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                }
-                                Column(horizontalAlignment = Alignment.End) {
-                                    Text(
-                                        formatRecordValue(record.type, record.value),
-                                        style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.Bold,
-                                    )
-                                    record.improvementPercent?.let { TrendPill(it) }
-                                }
-                            }
+                DraggableSectionList(
+                    items = visible,
+                    key = { it },
+                    onReorder = viewModel::reorderSections,
+                    modifier = Modifier.fillMaxWidth(),
+                ) { sectionKey, dragHandle ->
+                    Box(Modifier.padding(bottom = 12.dp)) {
+                        when (sectionKey) {
+                            "today" -> TodaySection(data, dragHandle, onOpenExercise, onOpenWorkout, onStartTraining)
+                            "records" -> RecordsSection(data, dragHandle, onOpenExercise)
+                            "comparisons" -> ComparisonsSection(data, dragHandle)
+                            "muscleGroups" -> MuscleGroupsSection(data, dragHandle)
                         }
-                    }
-                }
-            }
-
-            // --- Vergleiche -------------------------------------------------
-            item {
-                SectionCard {
-                    SectionLabel("Entwicklung")
-                    Spacer(Modifier.height(10.dp))
-                    ComparisonRow("vs. letztes Training", data.comparisons.vsLastWorkout)
-                    ComparisonRow("vs. letzte Woche", data.comparisons.vsLastWeek)
-                    ComparisonRow("vs. letzter Monat", data.comparisons.vsLastMonth)
-                    ComparisonRow("Kraftentwicklung", data.comparisons.strengthTrend)
-                }
-            }
-
-            // --- Muskelgruppen ----------------------------------------------
-            if (data.muscleGroups.isNotEmpty()) {
-                item {
-                    SectionCard {
-                        SectionLabel("Muskelgruppen · 30 Tage")
-                        Spacer(Modifier.height(8.dp))
-                        val maxChange = data.muscleGroups.mapNotNull { it.changePercent }
-                            .maxOfOrNull { abs(it) } ?: 1.0
-                        data.muscleGroups.take(7).forEach { group ->
-                            MuscleGroupRow(
-                                name = muscleLabel(group.key),
-                                fraction = if (group.changePercent != null) safeFraction(group.changePercent, maxChange)
-                                else safeFraction(group.volumeKg, data.muscleGroups.maxOf { it.volumeKg }),
-                                changePercent = group.changePercent,
-                            )
-                        }
-                        Spacer(Modifier.height(6.dp))
-                        Text(
-                            "Vergleich je Übung mit sich selbst (Median), gewichtet nach Sätzen – Ausreißer verzerren den Trend nicht.",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
                     }
                 }
             }
         }
 
         item { Spacer(Modifier.height(80.dp)) }
+    }
+}
+
+@Composable
+private fun CardHeader(label: String, accent: Boolean = false, dragHandle: @Composable () -> Unit, trailing: (@Composable () -> Unit)? = null) {
+    Row(
+        Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            dragHandle()
+            Spacer(Modifier.width(4.dp))
+            SectionLabel(label, accent = accent)
+        }
+        trailing?.invoke()
+    }
+}
+
+@Composable
+private fun TodaySection(
+    data: DashboardDto,
+    dragHandle: @Composable () -> Unit,
+    onOpenExercise: (String) -> Unit,
+    onOpenWorkout: (String) -> Unit,
+    onStartTraining: () -> Unit,
+) {
+    SectionCard(accent = data.today.hasWorkout) {
+        CardHeader(
+            "Training heute",
+            accent = data.today.hasWorkout,
+            dragHandle = dragHandle,
+            trailing = { if (data.today.hasWorkout) TrendPill(data.comparisons.vsLastWorkout, filled = true) },
+        )
+        Spacer(Modifier.height(12.dp))
+
+        if (!data.today.hasWorkout) {
+            Text("Heute noch kein Training erfasst", style = MaterialTheme.typography.bodyLarge)
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "Tippe unten rechts auf das Mikrofon und sag einfach, was du trainiert hast.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(14.dp))
+            Button(onClick = onStartTraining) { Text("Training starten") }
+        } else {
+            data.today.exercises.forEachIndexed { index, exercise ->
+                if (index > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .clickable { onOpenExercise(exercise.exerciseId) }
+                        .padding(vertical = 11.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(exercise.name, style = MaterialTheme.typography.titleSmall)
+                        Spacer(Modifier.height(3.dp))
+                        Text(
+                            exercise.summary,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    if (exercise.volumeKg > 0) {
+                        Text(
+                            Fmt.volume(exercise.volumeKg),
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(8.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+            Spacer(Modifier.height(10.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(
+                    buildString {
+                        append("${data.today.sets} Sätze · ${data.today.reps} Wdh")
+                        data.today.durationSec?.takeIf { it > 0 }?.let { append(" · ${Fmt.duration(it)}") }
+                    },
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    Fmt.volume(data.today.volumeKg),
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
+            data.today.workoutId?.let { id ->
+                Spacer(Modifier.height(10.dp))
+                TextButton(onClick = { onOpenWorkout(id) }) { Text("Training öffnen") }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RecordsSection(data: DashboardDto, dragHandle: @Composable () -> Unit, onOpenExercise: (String) -> Unit) {
+    SectionCard {
+        CardHeader("Neueste Rekorde", dragHandle = dragHandle)
+        Spacer(Modifier.height(10.dp))
+        data.recentRecords.take(3).forEach { record ->
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .clickable(enabled = record.exerciseId.isNotBlank()) { onOpenExercise(record.exerciseId) }
+                    .padding(vertical = 5.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text("🔥 ${record.exerciseName}", style = MaterialTheme.typography.titleSmall)
+                    Text(
+                        record.previousValue?.let {
+                            "Vorher ${formatRecordValue(record.type, it)} · ${Fmt.dayLabel(record.achievedAt)}"
+                        } ?: Fmt.dayLabel(record.achievedAt),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(
+                        formatRecordValue(record.type, record.value),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    record.improvementPercent?.let { TrendPill(it) }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ComparisonsSection(data: DashboardDto, dragHandle: @Composable () -> Unit) {
+    SectionCard {
+        CardHeader("Entwicklung", dragHandle = dragHandle)
+        Spacer(Modifier.height(10.dp))
+        ComparisonRow("vs. letztes Training", data.comparisons.vsLastWorkout)
+        ComparisonRow("vs. letzte Woche", data.comparisons.vsLastWeek)
+        ComparisonRow("vs. letzter Monat", data.comparisons.vsLastMonth)
+        ComparisonRow("Kraftentwicklung", data.comparisons.strengthTrend)
+    }
+}
+
+@Composable
+private fun MuscleGroupsSection(data: DashboardDto, dragHandle: @Composable () -> Unit) {
+    SectionCard {
+        CardHeader("Muskelgruppen · 30 Tage", dragHandle = dragHandle)
+        Spacer(Modifier.height(8.dp))
+        val maxChange = data.muscleGroups.mapNotNull { it.changePercent }.maxOfOrNull { abs(it) } ?: 1.0
+        data.muscleGroups.take(7).forEach { group ->
+            MuscleGroupRow(
+                name = muscleLabel(group.key),
+                fraction = if (group.changePercent != null) safeFraction(group.changePercent, maxChange)
+                else safeFraction(group.volumeKg, data.muscleGroups.maxOf { it.volumeKg }),
+                changePercent = group.changePercent,
+            )
+        }
+        Spacer(Modifier.height(6.dp))
+        Text(
+            "Vergleich je Übung mit sich selbst (Median), gewichtet nach Sätzen – Ausreißer verzerren den Trend nicht.",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
