@@ -39,7 +39,12 @@ data class HistoryUiState(
     val loading: Boolean = true,
     val offline: Boolean = false,
     val error: String? = null,
-)
+    /** Custom order (workout ids) for the unfiltered list, drag-reorderable. */
+    val order: List<String> = emptyList(),
+) {
+    /** Reordering only makes sense over the full, unfiltered list. */
+    val isReorderable: Boolean get() = filter == null
+}
 
 class HistoryViewModel(private val container: AppContainer) : ViewModel() {
     private val _state = MutableStateFlow(HistoryUiState())
@@ -53,9 +58,22 @@ class HistoryViewModel(private val container: AppContainer) : ViewModel() {
         viewModelScope.launch {
             container.workouts.observeCached().collect { cached ->
                 if (_state.value.workouts.isEmpty()) _state.value = _state.value.copy(workouts = cached, loading = false)
+                mergeOrder(cached.map { it.id })
             }
         }
         load()
+    }
+
+    /** Keeps the saved order valid as workouts are added or deleted. */
+    private fun mergeOrder(allIds: List<String>) {
+        val saved = container.settings.historyOrder.split(",").filter { it.isNotBlank() }
+        val merged = saved.filter { it in allIds } + allIds.filterNot { it in saved }
+        if (merged != _state.value.order) _state.value = _state.value.copy(order = merged)
+    }
+
+    fun reorder(newOrder: List<String>) {
+        _state.value = _state.value.copy(order = newOrder)
+        container.settings.historyOrder = newOrder.joinToString(",")
     }
 
     fun onFilter(key: String?) {
@@ -169,7 +187,66 @@ fun HistoryScreen(
         if (state.loading && state.workouts.isEmpty()) item { LoadingBox() }
 
         // --- Trainings ------------------------------------------------------
-        items(state.workouts, key = { it.id }) { workout ->
+        if (state.isReorderable) {
+            val rank = state.order.withIndex().associate { (position, id) -> id to position }
+            val ordered = state.workouts.sortedBy { rank[it.id] ?: Int.MAX_VALUE }
+            item {
+                DraggableSectionList(
+                    items = ordered,
+                    key = { it.id },
+                    onReorder = { moved -> viewModel.reorder(moved.map { it.id }) },
+                    modifier = Modifier.fillMaxWidth(),
+                ) { workout ->
+                    Box(Modifier.padding(bottom = 12.dp)) {
+                        WorkoutCard(
+                            workout = workout,
+                            onOpenWorkout = onOpenWorkout,
+                            onOpenExercise = onOpenExercise,
+                            onDelete = { pendingDelete = workout },
+                        )
+                    }
+                }
+            }
+        } else {
+            items(state.workouts, key = { it.id }) { workout ->
+                WorkoutCard(
+                    workout = workout,
+                    onOpenWorkout = onOpenWorkout,
+                    onOpenExercise = onOpenExercise,
+                    onDelete = { pendingDelete = workout },
+                )
+            }
+        }
+
+        if (!state.loading && state.workouts.isEmpty()) {
+            item { EmptyState("Noch keine Trainings") }
+        }
+        item { Spacer(Modifier.height(80.dp)) }
+    }
+
+    pendingDelete?.let { workout ->
+        AlertDialog(
+            onDismissRequest = { pendingDelete = null },
+            title = { Text("Training löschen?") },
+            text = { Text("${Fmt.relativeDay(workout.date)} mit ${workout.totalSets} Sätzen wird gelöscht. Rekorde werden neu berechnet.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.deleteWorkout(workout.id)
+                    pendingDelete = null
+                }) { Text("Löschen", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = { TextButton(onClick = { pendingDelete = null }) { Text("Abbrechen") } },
+        )
+    }
+}
+
+@Composable
+private fun WorkoutCard(
+    workout: WorkoutDto,
+    onOpenWorkout: (String) -> Unit,
+    onOpenExercise: (String) -> Unit,
+    onDelete: () -> Unit,
+) {
             SectionCard(modifier = Modifier.clickable { onOpenWorkout(workout.id) }) {
                 Row(
                     Modifier.fillMaxWidth(),
@@ -225,35 +302,13 @@ fun HistoryScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     TextButton(
-                        onClick = { pendingDelete = workout },
+                        onClick = onDelete,
                         contentPadding = PaddingValues(horizontal = 4.dp),
                     ) {
                         Text("Löschen", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error)
                     }
                 }
             }
-        }
-
-        if (!state.loading && state.workouts.isEmpty()) {
-            item { EmptyState("Noch keine Trainings") }
-        }
-        item { Spacer(Modifier.height(80.dp)) }
-    }
-
-    pendingDelete?.let { workout ->
-        AlertDialog(
-            onDismissRequest = { pendingDelete = null },
-            title = { Text("Training löschen?") },
-            text = { Text("${Fmt.relativeDay(workout.date)} mit ${workout.totalSets} Sätzen wird gelöscht. Rekorde werden neu berechnet.") },
-            confirmButton = {
-                TextButton(onClick = {
-                    viewModel.deleteWorkout(workout.id)
-                    pendingDelete = null
-                }) { Text("Löschen", color = MaterialTheme.colorScheme.error) }
-            },
-            dismissButton = { TextButton(onClick = { pendingDelete = null }) { Text("Abbrechen") } },
-        )
-    }
 }
 
 private fun summarize(exercise: com.gymapp.tracker.data.remote.WorkoutExerciseDto): String {

@@ -1,26 +1,27 @@
 package com.gymapp.tracker.ui.components
 
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key as keyedComposable
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.PointerEventPass
@@ -30,26 +31,29 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 
 /**
- * A vertical list of items the user can reorder by pressing and holding
- * anywhere on an item — not a dedicated handle — then dragging it up or down.
+ * A vertical list of cards the user reorders by pressing and holding anywhere
+ * on a card — no dedicated handle — and dragging it up or down.
  *
- * Built for a handful of cards, not a long list — it lays out every item
- * eagerly (no `LazyColumn`) so drag math stays simple: each item reports its
- * own pixel height via [Modifier.onGloballyPositioned], and crossing half of
- * a neighbour's height swaps the two in [order].
+ * Two details matter for the drag to feel solid under the finger:
  *
- * The long-press detector runs on [PointerEventPass.Initial], i.e. it sees
- * every touch before any child (a button, a clickable row, a text field)
- * gets a chance to claim it. A quick tap is never intercepted — the
- * detector only starts consuming events once the long-press timeout has
- * actually elapsed — so ordinary clicks inside [itemContent] keep working
- * everywhere on the card, and holding anywhere on the card starts a drag.
- * On release the card springs from wherever it was let go back to its
- * settled position instead of snapping there instantly.
+ * 1. **The touch target never moves.** The gesture lives on an outer box that
+ *    stays put; only an inner box is visually translated. If the pointer input
+ *    sat inside the moving layer, every translation would shift the reported
+ *    finger position too, and the card would oscillate instead of tracking the
+ *    finger.
+ * 2. **The list is not reordered mid-drag.** [order] changes only on release.
+ *    While dragging, the dragged card follows the finger 1:1 and its
+ *    neighbours slide aside to open a gap. Reordering during the gesture would
+ *    move the dragged card's node in the layout and tear down the very
+ *    gesture that is driving it.
+ *
+ * The long-press detector runs on [PointerEventPass.Initial], so it sees each
+ * touch before any child does — but consumes nothing until the long-press
+ * timeout has elapsed. A quick tap therefore still reaches buttons and
+ * clickable rows inside [itemContent] unchanged.
  */
 @Composable
 fun <T> DraggableSectionList(
@@ -59,100 +63,101 @@ fun <T> DraggableSectionList(
     modifier: Modifier = Modifier,
     itemContent: @Composable (item: T) -> Unit,
 ) {
-    val itemHeights = remember { mutableStateMapOf<String, Float>() }
-    // Actively being finger-dragged right now (drives the raw, 1:1 offset).
-    var interactingKey by remember { mutableStateOf<String?>(null) }
-    // Dragging OR still springing back into place — drives scale/shadow.
-    var elevatedKey by remember { mutableStateOf<String?>(null) }
-    val haptics = LocalHapticFeedback.current
-    val scope = rememberCoroutineScope()
-    // Local copy so a swap is visible immediately; committed via onReorder.
     var order by remember(items.map(key)) { mutableStateOf(items) }
+    val heights = remember { mutableStateMapOf<String, Float>() }
+    var draggingKey by remember { mutableStateOf<String?>(null) }
+    var dragOffset by remember { mutableFloatStateOf(0f) }
+    val haptics = LocalHapticFeedback.current
+    val cardShape = RoundedCornerShape(20.dp)
 
-    Column(modifier = modifier) {
-        order.forEach { item ->
+    val heightList = order.map { heights[key(it)] ?: 0f }
+    val fromIndex = draggingKey?.let { dragged -> order.indexOfFirst { key(it) == dragged } }
+        ?.takeIf { it >= 0 }
+    val toIndex = fromIndex?.let { targetIndexFor(it, dragOffset, heightList) }
+
+    Column(modifier) {
+        order.forEachIndexed { index, item ->
             val itemKey = key(item)
-            keyedComposable(itemKey) {
-                val isDragging = itemKey == interactingKey
-                val isElevated = itemKey == elevatedKey
-                val scale by animateFloatAsState(if (isElevated) 0.94f else 1f, label = "dragScale")
-                val elevation by animateDpAsState(if (isElevated) 14.dp else 0.dp, label = "dragElevation")
-                var rawOffset by remember { mutableFloatStateOf(0f) }
-                val springOffset = remember { Animatable(0f) }
+            key(itemKey) {
+                val isDragging = itemKey == draggingKey
 
-                Column(
+                // Where this card sits while a drag is in progress: the dragged
+                // one follows the finger, the ones it has passed step aside by
+                // exactly its height to open the gap it will drop into.
+                val gap = when {
+                    fromIndex == null || toIndex == null -> 0f
+                    index == fromIndex -> 0f
+                    index in (fromIndex + 1)..toIndex -> -heightList[fromIndex]
+                    index in toIndex..(fromIndex - 1) -> heightList[fromIndex]
+                    else -> 0f
+                }
+
+                val shift = remember { Animatable(0f) }
+                LaunchedEffect(gap, draggingKey) {
+                    // Snapping (not animating) back to zero once the drag ends
+                    // avoids a double-move: the commit already changed this
+                    // card's real position by the same amount.
+                    if (draggingKey == null) shift.snapTo(0f) else shift.animateTo(gap, tween(160))
+                }
+
+                val scale by animateFloatAsState(if (isDragging) 0.96f else 1f, label = "dragScale")
+                val lift by animateDpAsState(if (isDragging) 12.dp else 0.dp, label = "dragLift")
+
+                Box(
                     Modifier
-                        .zIndex(if (isElevated) 1f else 0f)
-                        .graphicsLayer {
-                            translationY = if (isDragging) rawOffset else springOffset.value
-                            scaleX = scale
-                            scaleY = scale
-                            shadowElevation = elevation.toPx()
-                            shape = RoundedCornerShape(20.dp)
-                            clip = false
-                        }
-                        .onGloballyPositioned { coordinates ->
-                            itemHeights[itemKey] = coordinates.size.height.toFloat()
-                        }
+                        .zIndex(if (isDragging) 1f else 0f)
+                        .onGloballyPositioned { heights[itemKey] = it.size.height.toFloat() }
                         .pointerInput(itemKey) {
-                            detectLongPressDragGestures(
+                            detectLongPressDrag(
                                 onDragStart = {
                                     haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                                    rawOffset = 0f
-                                    interactingKey = itemKey
-                                    elevatedKey = itemKey
+                                    dragOffset = 0f
+                                    draggingKey = itemKey
                                 },
-                                onDrag = { delta ->
-                                    rawOffset += delta.y
-                                    val draggedIndex = order.indexOf(item)
-
-                                    if (rawOffset > 0) {
-                                        val nextIndex = draggedIndex + 1
-                                        val nextItem = order.getOrNull(nextIndex)
-                                        val nextHeight = nextItem?.let { itemHeights[key(it)] }
-                                        if (nextItem != null && nextHeight != null && rawOffset > nextHeight / 2) {
-                                            order = order.toMutableList().apply {
-                                                removeAt(draggedIndex)
-                                                add(nextIndex, item)
-                                            }
-                                            rawOffset -= nextHeight
-                                        }
-                                    } else if (rawOffset < 0) {
-                                        val prevIndex = draggedIndex - 1
-                                        val prevItem = order.getOrNull(prevIndex)
-                                        val prevHeight = prevItem?.let { itemHeights[key(it)] }
-                                        if (prevItem != null && prevHeight != null && -rawOffset > prevHeight / 2) {
-                                            order = order.toMutableList().apply {
-                                                removeAt(draggedIndex)
-                                                add(prevIndex, item)
-                                            }
-                                            rawOffset += prevHeight
-                                        }
-                                    }
-                                },
+                                onDrag = { deltaY -> dragOffset += deltaY },
                                 onDragEnd = {
-                                    val settleFrom = rawOffset
-                                    interactingKey = null
-                                    onReorder(order)
-                                    scope.launch {
-                                        springOffset.snapTo(settleFrom)
-                                        springOffset.animateTo(0f, spring(dampingRatio = Spring.DampingRatioMediumBouncy))
-                                        if (elevatedKey == itemKey) elevatedKey = null
+                                    val from = order.indexOfFirst { key(it) == itemKey }
+                                    val to = targetIndexFor(
+                                        from,
+                                        dragOffset,
+                                        order.map { heights[key(it)] ?: 0f },
+                                    )
+                                    draggingKey = null
+                                    dragOffset = 0f
+                                    if (from >= 0 && to != from) {
+                                        order = order.toMutableList().apply { add(to, removeAt(from)) }
+                                        onReorder(order)
                                     }
                                 },
                                 onDragCancel = {
-                                    val settleFrom = rawOffset
-                                    interactingKey = null
-                                    scope.launch {
-                                        springOffset.snapTo(settleFrom)
-                                        springOffset.animateTo(0f, tween(150))
-                                        if (elevatedKey == itemKey) elevatedKey = null
-                                    }
+                                    draggingKey = null
+                                    dragOffset = 0f
                                 },
                             )
                         },
                 ) {
-                    itemContent(item)
+                    Box(
+                        Modifier
+                            .graphicsLayer {
+                                translationY = if (isDragging) dragOffset else shift.value
+                                scaleX = scale
+                                scaleY = scale
+                            }
+                            // Accent cards are translucent by design, so a lifted
+                            // card would show whatever it floats over. An opaque
+                            // backdrop while dragging keeps it readable.
+                            .then(
+                                if (lift > 0.dp) {
+                                    Modifier
+                                        .shadow(lift, cardShape, clip = false)
+                                        .background(MaterialTheme.colorScheme.background, cardShape)
+                                } else {
+                                    Modifier
+                                }
+                            ),
+                    ) {
+                        itemContent(item)
+                    }
                 }
             }
         }
@@ -160,25 +165,51 @@ fun <T> DraggableSectionList(
 }
 
 /**
- * Long-press-to-drag that wins over child click/tap handlers regardless of
- * where on the item the press lands.
+ * Which slot a card dragged [offset] pixels from [from] would land in.
  *
- * Runs on [PointerEventPass.Initial] so it observes every touch before
- * children see it. While the press is younger than the long-press timeout
- * nothing is consumed, so a plain tap reaches its child (a button, a
- * clickable row) completely unaffected. Once the timeout elapses without
- * the pointer lifting or moving past touch slop, this becomes the winning
- * gesture: it starts consuming events, which cancels whatever press state
- * a child gesture (e.g. `clickable`) had built up, and drives the drag.
- *
- * The callbacks are plain (non-suspend) on purpose: `awaitPointerEventScope`
- * is a restricted-suspension scope, so only its own await-functions may be
- * suspended on from inside here — any animation the caller wants to run off
- * the end of a drag has to be launched in its own coroutine scope instead.
+ * Walks outward one neighbour at a time, taking each slot only once the drag
+ * has covered half of that neighbour — so a card settles where it visually
+ * overlaps the most, and neighbours of different heights each need their own
+ * fair share of travel.
  */
-private suspend fun PointerInputScope.detectLongPressDragGestures(
+private fun targetIndexFor(from: Int, offset: Float, heights: List<Float>): Int {
+    if (from !in heights.indices) return from
+    var target = from
+    var covered = 0f
+    if (offset > 0f) {
+        var i = from + 1
+        while (i < heights.size && offset > covered + heights[i] / 2f) {
+            covered += heights[i]
+            target = i
+            i++
+        }
+    } else if (offset < 0f) {
+        var i = from - 1
+        while (i >= 0 && -offset > covered + heights[i] / 2f) {
+            covered += heights[i]
+            target = i
+            i--
+        }
+    }
+    return target
+}
+
+/**
+ * Long-press-to-drag that wins over child click handlers wherever the press
+ * lands, without stealing ordinary taps.
+ *
+ * Observes on [PointerEventPass.Initial] but consumes nothing until the
+ * long-press timeout has passed with the pointer still down and inside touch
+ * slop. Only then does it start consuming, which cancels any press state a
+ * child (`clickable`, a button) had built up, and drives the drag from there.
+ *
+ * Callbacks are deliberately non-suspending: `awaitPointerEventScope` is a
+ * restricted suspension scope, so anything the caller wants to await has to
+ * run in its own coroutine scope instead.
+ */
+private suspend fun PointerInputScope.detectLongPressDrag(
     onDragStart: () -> Unit,
-    onDrag: (dragAmount: Offset) -> Unit,
+    onDrag: (deltaY: Float) -> Unit,
     onDragEnd: () -> Unit,
     onDragCancel: () -> Unit,
 ) {
@@ -186,7 +217,7 @@ private suspend fun PointerInputScope.detectLongPressDragGestures(
         val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
         val touchSlop = viewConfiguration.touchSlop
 
-        val releasedOrMovedEarly = withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) {
+        val settledEarly = withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) {
             while (true) {
                 val event = awaitPointerEvent(PointerEventPass.Initial)
                 val change = event.changes.firstOrNull { it.id == down.id } ?: return@withTimeoutOrNull true
@@ -196,25 +227,24 @@ private suspend fun PointerInputScope.detectLongPressDragGestures(
             @Suppress("UNREACHABLE_CODE") true
         }
 
-        // Timing out (result == null) means the pointer was still down and
-        // roughly stationary for the whole timeout — that's the long press.
-        if (releasedOrMovedEarly == null) {
+        // A timeout (null) means the finger stayed down and roughly still for
+        // the full duration — that is the long press.
+        if (settledEarly == null) {
             onDragStart()
-            var lastPosition = down.position
-            var endedNormally = false
+            var lastY = down.position.y
+            var lifted = false
             while (true) {
                 val event = awaitPointerEvent(PointerEventPass.Initial)
                 val change = event.changes.firstOrNull { it.id == down.id } ?: break
                 change.consume()
                 if (!change.pressed) {
-                    endedNormally = true
+                    lifted = true
                     break
                 }
-                val delta = change.position - lastPosition
-                lastPosition = change.position
-                onDrag(delta)
+                onDrag(change.position.y - lastY)
+                lastY = change.position.y
             }
-            if (endedNormally) onDragEnd() else onDragCancel()
+            if (lifted) onDragEnd() else onDragCancel()
         }
     }
 }
