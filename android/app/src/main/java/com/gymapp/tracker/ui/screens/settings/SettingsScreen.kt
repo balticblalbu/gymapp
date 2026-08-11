@@ -222,13 +222,12 @@ fun SettingsScreen(
                 key = { it },
                 onReorder = viewModel::reorderSections,
                 modifier = Modifier.fillMaxWidth(),
-            ) { sectionKey, dragHandle ->
+            ) { sectionKey ->
                 Box(Modifier.padding(bottom = 12.dp)) {
                     when (sectionKey) {
                         "claude" -> ClaudeSection(
                             state = state,
                             viewModel = viewModel,
-                            dragHandle = dragHandle,
                             editingKey = editingKey,
                             onEditingKeyChange = { editingKey = it },
                             keyVisible = keyVisible,
@@ -237,16 +236,14 @@ fun SettingsScreen(
                         "display" -> DisplaySection(
                             state = state,
                             viewModel = viewModel,
-                            dragHandle = dragHandle,
                             themeMode = themeMode,
                             onThemeChange = onThemeChange,
                             nameDraft = nameDraft,
                             onNameDraftChange = { nameDraft = it },
                         )
-                        "update" -> UpdateSection(state = state, viewModel = viewModel, dragHandle = dragHandle)
+                        "update" -> UpdateSection(state = state, viewModel = viewModel)
                         "data" -> DataSection(
                             viewModel = viewModel,
-                            dragHandle = dragHandle,
                             context = context,
                             onDeleteRequested = { confirmDelete = true },
                         )
@@ -290,17 +287,13 @@ fun SettingsScreen(
 }
 
 @Composable
-private fun CardHeader(label: String, accent: Boolean = false, dragHandle: @Composable () -> Unit, trailing: (@Composable () -> Unit)? = null) {
+private fun CardHeader(label: String, accent: Boolean = false, trailing: (@Composable () -> Unit)? = null) {
     Row(
         Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            dragHandle()
-            Spacer(Modifier.width(4.dp))
-            SectionLabel(label, accent = accent)
-        }
+        SectionLabel(label, accent = accent)
         trailing?.invoke()
     }
 }
@@ -309,7 +302,6 @@ private fun CardHeader(label: String, accent: Boolean = false, dragHandle: @Comp
 private fun ClaudeSection(
     state: SettingsUiState,
     viewModel: SettingsViewModel,
-    dragHandle: @Composable () -> Unit,
     editingKey: Boolean,
     onEditingKeyChange: (Boolean) -> Unit,
     keyVisible: Boolean,
@@ -319,7 +311,6 @@ private fun ClaudeSection(
                 CardHeader(
                     "Claude API",
                     accent = !state.hasApiKey,
-                    dragHandle = dragHandle,
                     trailing = {
                         Text(
                             if (state.hasApiKey) "Aktiv" else "Kein Key",
@@ -414,14 +405,13 @@ private fun ClaudeSection(
 private fun DisplaySection(
     state: SettingsUiState,
     viewModel: SettingsViewModel,
-    dragHandle: @Composable () -> Unit,
     themeMode: ThemeMode,
     onThemeChange: (ThemeMode) -> Unit,
     nameDraft: String,
     onNameDraftChange: (String) -> Unit,
 ) {
             SectionCard {
-                CardHeader("Anzeige", dragHandle = dragHandle)
+                CardHeader("Anzeige")
                 Spacer(Modifier.height(10.dp))
                 OutlinedTextField(
                     value = nameDraft,
@@ -461,11 +451,10 @@ private fun DisplaySection(
 }
 
 @Composable
-private fun UpdateSection(state: SettingsUiState, viewModel: SettingsViewModel, dragHandle: @Composable () -> Unit) {
+private fun UpdateSection(state: SettingsUiState, viewModel: SettingsViewModel) {
             SectionCard {
                 CardHeader(
                     "App-Update",
-                    dragHandle = dragHandle,
                     trailing = {
                         Text(
                             state.currentVersion,
@@ -526,12 +515,11 @@ private fun UpdateSection(state: SettingsUiState, viewModel: SettingsViewModel, 
 @Composable
 private fun DataSection(
     viewModel: SettingsViewModel,
-    dragHandle: @Composable () -> Unit,
     context: Context,
     onDeleteRequested: () -> Unit,
 ) {
             SectionCard {
-                CardHeader("Daten", dragHandle = dragHandle)
+                CardHeader("Daten")
                 Spacer(Modifier.height(8.dp))
                 Text(
                     "Deine Trainings liegen ausschließlich auf diesem Gerät. Exportiere sie " +

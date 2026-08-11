@@ -170,13 +170,13 @@ fun DashboardScreen(
                     key = { it },
                     onReorder = viewModel::reorderSections,
                     modifier = Modifier.fillMaxWidth(),
-                ) { sectionKey, dragHandle ->
+                ) { sectionKey ->
                     Box(Modifier.padding(bottom = 12.dp)) {
                         when (sectionKey) {
-                            "today" -> TodaySection(data, dragHandle, onOpenExercise, onOpenWorkout, onStartTraining)
-                            "records" -> RecordsSection(data, dragHandle, onOpenExercise)
-                            "comparisons" -> ComparisonsSection(data, dragHandle)
-                            "muscleGroups" -> MuscleGroupsSection(data, dragHandle)
+                            "today" -> TodaySection(data, onOpenExercise, onOpenWorkout, onStartTraining)
+                            "records" -> RecordsSection(data, onOpenExercise)
+                            "comparisons" -> ComparisonsSection(data)
+                            "muscleGroups" -> MuscleGroupsSection(data)
                         }
                     }
                 }
@@ -188,17 +188,13 @@ fun DashboardScreen(
 }
 
 @Composable
-private fun CardHeader(label: String, accent: Boolean = false, dragHandle: @Composable () -> Unit, trailing: (@Composable () -> Unit)? = null) {
+private fun CardHeader(label: String, accent: Boolean = false, trailing: (@Composable () -> Unit)? = null) {
     Row(
         Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            dragHandle()
-            Spacer(Modifier.width(4.dp))
-            SectionLabel(label, accent = accent)
-        }
+        SectionLabel(label, accent = accent)
         trailing?.invoke()
     }
 }
@@ -206,7 +202,6 @@ private fun CardHeader(label: String, accent: Boolean = false, dragHandle: @Comp
 @Composable
 private fun TodaySection(
     data: DashboardDto,
-    dragHandle: @Composable () -> Unit,
     onOpenExercise: (String) -> Unit,
     onOpenWorkout: (String) -> Unit,
     onStartTraining: () -> Unit,
@@ -215,7 +210,6 @@ private fun TodaySection(
         CardHeader(
             "Training heute",
             accent = data.today.hasWorkout,
-            dragHandle = dragHandle,
             trailing = { if (data.today.hasWorkout) TrendPill(data.comparisons.vsLastWorkout, filled = true) },
         )
         Spacer(Modifier.height(12.dp))
@@ -286,9 +280,9 @@ private fun TodaySection(
 }
 
 @Composable
-private fun RecordsSection(data: DashboardDto, dragHandle: @Composable () -> Unit, onOpenExercise: (String) -> Unit) {
+private fun RecordsSection(data: DashboardDto, onOpenExercise: (String) -> Unit) {
     SectionCard {
-        CardHeader("Neueste Rekorde", dragHandle = dragHandle)
+        CardHeader("Neueste Rekorde")
         Spacer(Modifier.height(10.dp))
         data.recentRecords.take(3).forEach { record ->
             Row(
@@ -323,9 +317,9 @@ private fun RecordsSection(data: DashboardDto, dragHandle: @Composable () -> Uni
 }
 
 @Composable
-private fun ComparisonsSection(data: DashboardDto, dragHandle: @Composable () -> Unit) {
+private fun ComparisonsSection(data: DashboardDto) {
     SectionCard {
-        CardHeader("Entwicklung", dragHandle = dragHandle)
+        CardHeader("Entwicklung")
         Spacer(Modifier.height(10.dp))
         ComparisonRow("vs. letztes Training", data.comparisons.vsLastWorkout)
         ComparisonRow("vs. letzte Woche", data.comparisons.vsLastWeek)
@@ -335,9 +329,9 @@ private fun ComparisonsSection(data: DashboardDto, dragHandle: @Composable () ->
 }
 
 @Composable
-private fun MuscleGroupsSection(data: DashboardDto, dragHandle: @Composable () -> Unit) {
+private fun MuscleGroupsSection(data: DashboardDto) {
     SectionCard {
-        CardHeader("Muskelgruppen · 30 Tage", dragHandle = dragHandle)
+        CardHeader("Muskelgruppen · 30 Tage")
         Spacer(Modifier.height(8.dp))
         val maxChange = data.muscleGroups.mapNotNull { it.changePercent }.maxOfOrNull { abs(it) } ?: 1.0
         data.muscleGroups.take(7).forEach { group ->
