@@ -46,6 +46,10 @@ class SettingsRepository(private val prefs: TokenStore) {
     var settingsOrder: String
         get() = prefs.settingsOrder
         set(value) { prefs.settingsOrder = value }
+
+    var exerciseOrder: String
+        get() = prefs.exerciseOrder
+        set(value) { prefs.exerciseOrder = value }
 }
 
 /** CSV and JSON export — the only backup path now that data lives on-device. */

@@ -36,7 +36,12 @@ data class ExercisesUiState(
     val loading: Boolean = true,
     val offline: Boolean = false,
     val error: String? = null,
-)
+    /** Custom order (exercise ids) for the unfiltered catalogue, drag-reorderable. */
+    val order: List<String> = emptyList(),
+) {
+    /** Reordering only makes sense over the full, unfiltered catalogue. */
+    val isReorderable: Boolean get() = query.isBlank() && filter == null
+}
 
 class ExercisesViewModel(private val container: AppContainer) : ViewModel() {
     private val _state = MutableStateFlow(ExercisesUiState())
@@ -48,14 +53,30 @@ class ExercisesViewModel(private val container: AppContainer) : ViewModel() {
                 .onSuccess { groups -> _state.value = _state.value.copy(muscleGroups = groups.filter { it.parentKey == null }) }
         }
         viewModelScope.launch {
-            // Cached list keeps the screen usable while the request is in flight.
+            // Cached list keeps the screen usable while the request is in flight,
+            // and its ids (always the full, unfiltered catalogue) are what the
+            // drag order is merged against as exercises are added or removed.
             container.exercises.observeCached().collect { cached ->
                 if (_state.value.exercises.isEmpty()) {
                     _state.value = _state.value.copy(exercises = cached, loading = false)
                 }
+                mergeOrder(cached.map { it.id })
             }
         }
         load()
+    }
+
+    private fun mergeOrder(allIds: List<String>) {
+        val saved = container.settings.exerciseOrder.split(",").filter { it.isNotBlank() }
+        val merged = saved.filter { it in allIds } + allIds.filterNot { it in saved }
+        if (merged != _state.value.order) {
+            _state.value = _state.value.copy(order = merged)
+        }
+    }
+
+    fun reorder(newOrder: List<String>) {
+        _state.value = _state.value.copy(order = newOrder)
+        container.settings.exerciseOrder = newOrder.joinToString(",")
     }
 
     fun onQuery(value: String) {
@@ -139,25 +160,24 @@ fun ExercisesScreen(viewModel: ExercisesViewModel, onOpenExercise: (String) -> U
             state.error?.let { item { StatusBanner(it, isError = true, onAction = viewModel::load, actionLabel = "Erneut") } }
             if (state.loading && state.exercises.isEmpty()) item { LoadingBox() }
 
-            items(state.exercises, key = { it.id }) { exercise ->
-                SectionCard(modifier = Modifier.clickable { onOpenExercise(exercise.id) }) {
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Column(Modifier.weight(1f)) {
-                            Text(exercise.displayName, style = MaterialTheme.typography.titleSmall)
-                            Spacer(Modifier.height(2.dp))
-                            Text(
-                                buildString {
-                                    append(exercise.muscleGroups.joinToString(" · ") { muscleLabel(it.key) })
-                                    exercise.equipment?.let { append(" · $it") }
-                                    ExerciseTypeLabels[exercise.type]?.takeIf { exercise.type != "STRENGTH" }
-                                        ?.let { append(" · $it") }
-                                },
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
+            if (state.isReorderable) {
+                val indexOf = state.order.withIndex().associate { (i, id) -> id to i }
+                val ordered = state.exercises.sortedBy { indexOf[it.id] ?: Int.MAX_VALUE }
+                item {
+                    DraggableSectionList(
+                        items = ordered,
+                        key = { it.id },
+                        onReorder = { newOrder -> viewModel.reorder(newOrder.map { it.id }) },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) { exercise ->
+                        Box(Modifier.padding(bottom = 8.dp)) {
+                            ExerciseRow(exercise, onOpenExercise = onOpenExercise, onEdit = { editing = exercise })
                         }
-                        TextButton(onClick = { editing = exercise }) { Text("Bearbeiten") }
                     }
+                }
+            } else {
+                items(state.exercises, key = { it.id }) { exercise ->
+                    ExerciseRow(exercise, onOpenExercise = onOpenExercise, onEdit = { editing = exercise })
                 }
             }
 
@@ -194,6 +214,29 @@ fun ExercisesScreen(viewModel: ExercisesViewModel, onOpenExercise: (String) -> U
             } else null,
             onSave = { request -> viewModel.update(exercise.id, request) { editing = null } },
         )
+    }
+}
+
+@Composable
+private fun ExerciseRow(exercise: ExerciseDto, onOpenExercise: (String) -> Unit, onEdit: () -> Unit) {
+    SectionCard(modifier = Modifier.clickable { onOpenExercise(exercise.id) }) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(exercise.displayName, style = MaterialTheme.typography.titleSmall)
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    buildString {
+                        append(exercise.muscleGroups.joinToString(" · ") { muscleLabel(it.key) })
+                        exercise.equipment?.let { append(" · $it") }
+                        ExerciseTypeLabels[exercise.type]?.takeIf { exercise.type != "STRENGTH" }
+                            ?.let { append(" · $it") }
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            TextButton(onClick = onEdit) { Text("Bearbeiten") }
+        }
     }
 }
 

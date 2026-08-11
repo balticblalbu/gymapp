@@ -1,7 +1,10 @@
 package com.gymapp.tracker.ui.components
 
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -10,12 +13,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 
 /**
@@ -52,12 +55,22 @@ fun <T> DraggableSectionList(
         order.forEach { item ->
             val itemKey = key(item)
             val isDragging = itemKey == draggingKey
+            // Shrinks and lifts the card while it's being dragged, so it visibly
+            // floats above its neighbours instead of just swapping positions.
+            val scale by animateFloatAsState(if (isDragging) 0.94f else 1f, label = "dragScale")
+            val elevation by animateDpAsState(if (isDragging) 14.dp else 0.dp, label = "dragElevation")
 
             Column(
                 Modifier
                     .zIndex(if (isDragging) 1f else 0f)
-                    .graphicsLayer { translationY = if (isDragging) dragOffset else 0f }
-                    .alpha(if (isDragging) 0.94f else 1f)
+                    .graphicsLayer {
+                        translationY = if (isDragging) dragOffset else 0f
+                        scaleX = scale
+                        scaleY = scale
+                        shadowElevation = elevation.toPx()
+                        shape = RoundedCornerShape(20.dp)
+                        clip = false
+                    }
                     .onGloballyPositioned { coordinates ->
                         itemHeights[itemKey] = coordinates.size.height.toFloat()
                     }

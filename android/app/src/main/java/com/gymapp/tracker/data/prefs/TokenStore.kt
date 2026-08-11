@@ -84,6 +84,11 @@ class TokenStore(context: Context) {
         get() = prefs.getString(KEY_SETTINGS_ORDER, DEFAULT_SETTINGS_ORDER) ?: DEFAULT_SETTINGS_ORDER
         set(value) = prefs.edit().putString(KEY_SETTINGS_ORDER, value).apply()
 
+    /** Custom order of the (unfiltered) exercise catalogue, comma separated exercise ids. */
+    var exerciseOrder: String
+        get() = prefs.getString(KEY_EXERCISE_ORDER, "") ?: ""
+        set(value) = prefs.edit().putString(KEY_EXERCISE_ORDER, value).apply()
+
     private companion object {
         const val FILE_NAME = "gymapp_secure_prefs"
         const val KEY_API = "anthropic_api_key"
@@ -100,5 +105,6 @@ class TokenStore(context: Context) {
         const val DEFAULT_DASHBOARD_ORDER = "today,records,comparisons,muscleGroups"
         const val KEY_SETTINGS_ORDER = "settings_order"
         const val DEFAULT_SETTINGS_ORDER = "claude,display,update,data"
+        const val KEY_EXERCISE_ORDER = "exercise_order"
     }
 }
