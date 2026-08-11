@@ -130,10 +130,12 @@ fun ExercisesScreen(viewModel: ExercisesViewModel, onOpenExercise: (String) -> U
     var editing by remember { mutableStateOf<ExerciseDto?>(null) }
     var creating by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
+    val scroller = rememberDragAutoScroller(listState)
 
     Box(Modifier.fillMaxSize()) {
         LazyColumn(
             state = listState,
+            modifier = Modifier.dragAutoScrollBounds(scroller),
             contentPadding = PaddingValues(horizontal = 18.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
@@ -181,7 +183,7 @@ fun ExercisesScreen(viewModel: ExercisesViewModel, onOpenExercise: (String) -> U
                         key = { it.id },
                         onReorder = { newOrder -> viewModel.reorder(newOrder.map { it.id }) },
                         modifier = Modifier.fillMaxWidth(),
-                        scrollState = listState,
+                        scroller = scroller,
                     ) { exercise ->
                         Box(Modifier.padding(bottom = 8.dp)) {
                             ExerciseRow(exercise, onOpenExercise = onOpenExercise, onEdit = { editing = exercise })

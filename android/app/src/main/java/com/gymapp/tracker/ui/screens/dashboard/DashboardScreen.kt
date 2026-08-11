@@ -111,10 +111,11 @@ fun DashboardScreen(
     val state by viewModel.state.collectAsState()
     val dashboard = state.dashboard
     val listState = rememberLazyListState()
+    val scroller = rememberDragAutoScroller(listState)
 
     LazyColumn(
         state = listState,
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier.fillMaxSize().dragAutoScrollBounds(scroller),
         contentPadding = PaddingValues(horizontal = 18.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
@@ -173,7 +174,7 @@ fun DashboardScreen(
                     key = { it },
                     onReorder = viewModel::reorderSections,
                     modifier = Modifier.fillMaxWidth(),
-                    scrollState = listState,
+                    scroller = scroller,
                 ) { sectionKey ->
                     Box(Modifier.padding(bottom = 12.dp)) {
                         when (sectionKey) {

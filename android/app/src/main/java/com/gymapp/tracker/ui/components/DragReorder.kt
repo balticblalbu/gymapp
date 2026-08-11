@@ -15,6 +15,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
@@ -32,7 +33,6 @@ import androidx.compose.ui.input.pointer.PointerInputScope
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
@@ -40,10 +40,39 @@ import androidx.compose.ui.zIndex
 import kotlinx.coroutines.withTimeoutOrNull
 
 /**
+ * Connects a scrolling list to the [DraggableSectionList] inside it, so a card
+ * held against an edge pulls the list along instead of running off it.
+ *
+ * The list's real bounds have to be measured rather than assumed: the visible
+ * area is neither the full screen nor the full content — status bar, bottom
+ * navigation and insets all cut into it, and a card judged against the wrong
+ * bounds gets clipped away before the auto-scroll ever starts.
+ *
+ * Apply [dragAutoScrollBounds] to the list and hand the same instance to
+ * [DraggableSectionList].
+ */
+@Stable
+class DragAutoScroller internal constructor(internal val state: ScrollableState) {
+    internal var topInRoot by mutableFloatStateOf(0f)
+    internal var height by mutableFloatStateOf(0f)
+}
+
+@Composable
+fun rememberDragAutoScroller(state: ScrollableState): DragAutoScroller =
+    remember(state) { DragAutoScroller(state) }
+
+/** Measures the list's visible area for [DragAutoScroller]. */
+fun Modifier.dragAutoScrollBounds(scroller: DragAutoScroller): Modifier =
+    onGloballyPositioned { coordinates ->
+        scroller.topInRoot = coordinates.positionInRoot().y
+        scroller.height = coordinates.size.height.toFloat()
+    }
+
+/**
  * A vertical list of cards the user reorders by pressing and holding anywhere
  * on a card — no dedicated handle — and dragging it up or down.
  *
- * Two details matter for the drag to feel solid under the finger:
+ * Three details matter for the drag to feel solid under the finger:
  *
  * 1. **The touch target never moves.** The gesture lives on an outer box that
  *    stays put; only an inner box is visually translated. If the pointer input
@@ -55,15 +84,17 @@ import kotlinx.coroutines.withTimeoutOrNull
  *    neighbours slide aside to open a gap. Reordering during the gesture would
  *    move the dragged card's node in the layout and tear down the very
  *    gesture that is driving it.
+ * 3. **The card stays inside the list.** Its travel is clamped to the visible
+ *    area, so it can never be pushed under a neighbouring bar and vanish.
  *
  * The long-press detector runs on [PointerEventPass.Initial], so it sees each
  * touch before any child does — but consumes nothing until the long-press
  * timeout has elapsed. A quick tap therefore still reaches buttons and
  * clickable rows inside [itemContent] unchanged.
  *
- * Pass the surrounding list's [scrollState] to let a card dragged against the
- * top or bottom edge pull the page along with it — without it, a card can only
- * be moved as far as the screen currently shows.
+ * Pass a [scroller] to let a card dragged against the top or bottom edge pull
+ * the page along with it; without one, a card only moves as far as the screen
+ * currently shows.
  */
 @Composable
 fun <T> DraggableSectionList(
@@ -71,7 +102,7 @@ fun <T> DraggableSectionList(
     key: (T) -> String,
     onReorder: (List<T>) -> Unit,
     modifier: Modifier = Modifier,
-    scrollState: ScrollableState? = null,
+    scroller: DragAutoScroller? = null,
     itemContent: @Composable (item: T) -> Unit,
 ) {
     var order by remember(items.map(key)) { mutableStateOf(items) }
@@ -83,28 +114,45 @@ fun <T> DraggableSectionList(
     val cardShape = RoundedCornerShape(20.dp)
 
     val density = LocalDensity.current
-    val viewportHeight = with(density) { LocalConfiguration.current.screenHeightDp.dp.toPx() }
-    val edgeZone = with(density) { 120.dp.toPx() }
-    val maxScrollStep = with(density) { 10.dp.toPx() }
+    val edgeZone = with(density) { 96.dp.toPx() }
+    val maxScrollStep = with(density) { 11.dp.toPx() }
+
+    // Keeps the dragged card fully inside the list's visible area, however far
+    // the finger travels — at the ends of the list there is nothing left to
+    // scroll, and an unclamped card would simply slide out of sight.
+    fun clampToViewport(offset: Float, itemKey: String): Float {
+        val bounds = scroller ?: return offset
+        if (bounds.height <= 0f) return offset
+        val top = topsInRoot[itemKey] ?: return offset
+        val lowest = bounds.topInRoot - top
+        val highest = bounds.topInRoot + bounds.height - (heights[itemKey] ?: 0f) - top
+        return if (lowest <= highest) offset.coerceIn(lowest, highest) else offset
+    }
 
     // Auto-scroll while a card is held against an edge. Whatever the list
     // actually scrolls is added back onto the drag offset, so the card stays
     // pinned under the finger and keeps advancing through the list.
-    LaunchedEffect(draggingKey, scrollState) {
-        val list = scrollState ?: return@LaunchedEffect
+    LaunchedEffect(draggingKey, scroller) {
+        val bounds = scroller ?: return@LaunchedEffect
         if (draggingKey == null) return@LaunchedEffect
         while (true) {
             withFrameNanos { }
             val dragged = draggingKey ?: break
             val top = topsInRoot[dragged] ?: break
             val centre = top + (heights[dragged] ?: 0f) / 2f + dragOffset
+            val viewTop = bounds.topInRoot
+            val viewBottom = viewTop + bounds.height
             val step = when {
-                centre < edgeZone -> -((edgeZone - centre) / edgeZone) * maxScrollStep
-                centre > viewportHeight - edgeZone ->
-                    ((centre - (viewportHeight - edgeZone)) / edgeZone) * maxScrollStep
+                centre < viewTop + edgeZone -> -((viewTop + edgeZone - centre) / edgeZone) * maxScrollStep
+                centre > viewBottom - edgeZone -> ((centre - (viewBottom - edgeZone)) / edgeZone) * maxScrollStep
                 else -> 0f
             }
-            if (step != 0f) dragOffset += list.scrollBy(step.coerceIn(-maxScrollStep, maxScrollStep))
+            if (step != 0f) {
+                dragOffset = clampToViewport(
+                    dragOffset + bounds.state.scrollBy(step.coerceIn(-maxScrollStep, maxScrollStep)),
+                    dragged,
+                )
+            }
         }
     }
 
@@ -155,7 +203,9 @@ fun <T> DraggableSectionList(
                                     dragOffset = 0f
                                     draggingKey = itemKey
                                 },
-                                onDrag = { deltaY -> dragOffset += deltaY },
+                                onDrag = { deltaY ->
+                                    dragOffset = clampToViewport(dragOffset + deltaY, itemKey)
+                                },
                                 onDragEnd = {
                                     val from = order.indexOfFirst { key(it) == itemKey }
                                     val to = targetIndexFor(

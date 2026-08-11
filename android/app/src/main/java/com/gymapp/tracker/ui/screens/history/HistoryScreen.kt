@@ -129,9 +129,11 @@ fun HistoryScreen(
     val state by viewModel.state.collectAsState()
     var pendingDelete by remember { mutableStateOf<WorkoutDto?>(null) }
     val listState = rememberLazyListState()
+    val scroller = rememberDragAutoScroller(listState)
 
     LazyColumn(
         state = listState,
+        modifier = Modifier.dragAutoScrollBounds(scroller),
         contentPadding = PaddingValues(horizontal = 18.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
@@ -199,7 +201,7 @@ fun HistoryScreen(
                     key = { it.id },
                     onReorder = { moved -> viewModel.reorder(moved.map { it.id }) },
                     modifier = Modifier.fillMaxWidth(),
-                    scrollState = listState,
+                    scroller = scroller,
                 ) { workout ->
                     Box(Modifier.padding(bottom = 12.dp)) {
                         WorkoutCard(

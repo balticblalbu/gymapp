@@ -26,6 +26,8 @@ import com.gymapp.tracker.AppContainer
 import com.gymapp.tracker.data.remote.UpdateUserRequest
 import com.gymapp.tracker.data.remote.UserDto
 import com.gymapp.tracker.ui.components.DraggableSectionList
+import com.gymapp.tracker.ui.components.dragAutoScrollBounds
+import com.gymapp.tracker.ui.components.rememberDragAutoScroller
 import com.gymapp.tracker.ui.components.PeriodSelector
 import com.gymapp.tracker.ui.components.SectionCard
 import com.gymapp.tracker.ui.components.SectionLabel
@@ -211,9 +213,11 @@ fun SettingsScreen(
     }
 
     val listState = rememberLazyListState()
+    val scroller = rememberDragAutoScroller(listState)
 
     LazyColumn(
         state = listState,
+        modifier = Modifier.dragAutoScrollBounds(scroller),
         contentPadding = PaddingValues(horizontal = 18.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
@@ -226,7 +230,7 @@ fun SettingsScreen(
                 key = { it },
                 onReorder = viewModel::reorderSections,
                 modifier = Modifier.fillMaxWidth(),
-                scrollState = listState,
+                scroller = scroller,
             ) { sectionKey ->
                 Box(Modifier.padding(bottom = 12.dp)) {
                     when (sectionKey) {
