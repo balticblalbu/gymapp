@@ -209,9 +209,12 @@ private fun MainScaffold(
     }
 
     if (showVoice) {
+        val voiceViewModel = viewModel { VoiceViewModel(container) }
         VoiceSheet(
-            viewModel = viewModel { VoiceViewModel(container) },
-            onDismiss = { showVoice = false },
+            viewModel = voiceViewModel,
+            // Closing without a save clears the draft, so the next mic tap
+            // starts from an empty field instead of the leftover text.
+            onDismiss = { showVoice = false; voiceViewModel.reset() },
             onSaved = { dataVersion += 1 },
         )
     }

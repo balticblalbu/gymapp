@@ -135,7 +135,16 @@ fun ExercisesScreen(viewModel: ExercisesViewModel, onOpenExercise: (String) -> U
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             item {
-                Text("Übungen", style = MaterialTheme.typography.headlineMedium)
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text("Übungen", style = MaterialTheme.typography.headlineMedium)
+                    FilledTonalIconButton(onClick = { creating = true }) {
+                        Icon(Icons.Default.Add, contentDescription = "Neue Übung")
+                    }
+                }
                 Spacer(Modifier.height(12.dp))
                 OutlinedTextField(
                     value = state.query,
@@ -185,13 +194,6 @@ fun ExercisesScreen(viewModel: ExercisesViewModel, onOpenExercise: (String) -> U
                 item { EmptyState("Keine Übung gefunden", "Lege eine neue Übung an – oder diktiere sie dem Telegram-Bot.") }
             }
             item { Spacer(Modifier.height(90.dp)) }
-        }
-
-        FloatingActionButton(
-            onClick = { creating = true },
-            modifier = Modifier.align(Alignment.BottomEnd).padding(20.dp),
-        ) {
-            Icon(Icons.Default.Add, contentDescription = "Neue Übung")
         }
     }
 

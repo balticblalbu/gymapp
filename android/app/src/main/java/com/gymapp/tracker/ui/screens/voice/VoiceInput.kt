@@ -126,6 +126,11 @@ class VoiceViewModel(private val container: AppContainer) : ViewModel() {
     fun dismissReply() {
         _state.value = _state.value.copy(reply = null, savedSomething = false)
     }
+
+    /** Wipes any typed/recognised text so reopening the sheet starts fresh. */
+    fun reset() {
+        _state.value = VoiceUiState()
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
@@ -144,8 +149,11 @@ fun VoiceSheet(
     // Sends and closes the keyboard together, so the reply card underneath
     // the field becomes visible instead of staying hidden behind it.
     fun sendAndHideKeyboard(spoken: Boolean) {
+        // Force-clearing focus (not just hide()) is what actually dismisses the
+        // IME reliably inside a ModalBottomSheet — hide() alone sometimes has no
+        // effect while the field still holds focus.
+        focusManager.clearFocus(force = true)
         keyboardController?.hide()
-        focusManager.clearFocus()
         viewModel.send(spoken)
     }
     var hasPermission by remember {
