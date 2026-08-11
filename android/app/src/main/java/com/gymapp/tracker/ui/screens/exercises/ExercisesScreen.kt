@@ -5,6 +5,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -128,9 +129,11 @@ fun ExercisesScreen(viewModel: ExercisesViewModel, onOpenExercise: (String) -> U
     val state by viewModel.state.collectAsState()
     var editing by remember { mutableStateOf<ExerciseDto?>(null) }
     var creating by remember { mutableStateOf(false) }
+    val listState = rememberLazyListState()
 
     Box(Modifier.fillMaxSize()) {
         LazyColumn(
+            state = listState,
             contentPadding = PaddingValues(horizontal = 18.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
@@ -178,6 +181,7 @@ fun ExercisesScreen(viewModel: ExercisesViewModel, onOpenExercise: (String) -> U
                         key = { it.id },
                         onReorder = { newOrder -> viewModel.reorder(newOrder.map { it.id }) },
                         modifier = Modifier.fillMaxWidth(),
+                        scrollState = listState,
                     ) { exercise ->
                         Box(Modifier.padding(bottom = 8.dp)) {
                             ExerciseRow(exercise, onOpenExercise = onOpenExercise, onEdit = { editing = exercise })

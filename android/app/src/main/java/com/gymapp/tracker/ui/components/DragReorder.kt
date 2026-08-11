@@ -5,8 +5,10 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.ScrollableState
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -20,6 +22,7 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.graphicsLayer
@@ -28,6 +31,9 @@ import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerInputScope
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
@@ -54,6 +60,10 @@ import kotlinx.coroutines.withTimeoutOrNull
  * touch before any child does — but consumes nothing until the long-press
  * timeout has elapsed. A quick tap therefore still reaches buttons and
  * clickable rows inside [itemContent] unchanged.
+ *
+ * Pass the surrounding list's [scrollState] to let a card dragged against the
+ * top or bottom edge pull the page along with it — without it, a card can only
+ * be moved as far as the screen currently shows.
  */
 @Composable
 fun <T> DraggableSectionList(
@@ -61,14 +71,42 @@ fun <T> DraggableSectionList(
     key: (T) -> String,
     onReorder: (List<T>) -> Unit,
     modifier: Modifier = Modifier,
+    scrollState: ScrollableState? = null,
     itemContent: @Composable (item: T) -> Unit,
 ) {
     var order by remember(items.map(key)) { mutableStateOf(items) }
     val heights = remember { mutableStateMapOf<String, Float>() }
+    val topsInRoot = remember { mutableStateMapOf<String, Float>() }
     var draggingKey by remember { mutableStateOf<String?>(null) }
     var dragOffset by remember { mutableFloatStateOf(0f) }
     val haptics = LocalHapticFeedback.current
     val cardShape = RoundedCornerShape(20.dp)
+
+    val density = LocalDensity.current
+    val viewportHeight = with(density) { LocalConfiguration.current.screenHeightDp.dp.toPx() }
+    val edgeZone = with(density) { 120.dp.toPx() }
+    val maxScrollStep = with(density) { 10.dp.toPx() }
+
+    // Auto-scroll while a card is held against an edge. Whatever the list
+    // actually scrolls is added back onto the drag offset, so the card stays
+    // pinned under the finger and keeps advancing through the list.
+    LaunchedEffect(draggingKey, scrollState) {
+        val list = scrollState ?: return@LaunchedEffect
+        if (draggingKey == null) return@LaunchedEffect
+        while (true) {
+            withFrameNanos { }
+            val dragged = draggingKey ?: break
+            val top = topsInRoot[dragged] ?: break
+            val centre = top + (heights[dragged] ?: 0f) / 2f + dragOffset
+            val step = when {
+                centre < edgeZone -> -((edgeZone - centre) / edgeZone) * maxScrollStep
+                centre > viewportHeight - edgeZone ->
+                    ((centre - (viewportHeight - edgeZone)) / edgeZone) * maxScrollStep
+                else -> 0f
+            }
+            if (step != 0f) dragOffset += list.scrollBy(step.coerceIn(-maxScrollStep, maxScrollStep))
+        }
+    }
 
     val heightList = order.map { heights[key(it)] ?: 0f }
     val fromIndex = draggingKey?.let { dragged -> order.indexOfFirst { key(it) == dragged } }
@@ -106,7 +144,10 @@ fun <T> DraggableSectionList(
                 Box(
                     Modifier
                         .zIndex(if (isDragging) 1f else 0f)
-                        .onGloballyPositioned { heights[itemKey] = it.size.height.toFloat() }
+                        .onGloballyPositioned {
+                            heights[itemKey] = it.size.height.toFloat()
+                            topsInRoot[itemKey] = it.positionInRoot().y
+                        }
                         .pointerInput(itemKey) {
                             detectLongPressDrag(
                                 onDragStart = {

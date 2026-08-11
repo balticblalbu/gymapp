@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
@@ -109,8 +110,10 @@ fun DashboardScreen(
 ) {
     val state by viewModel.state.collectAsState()
     val dashboard = state.dashboard
+    val listState = rememberLazyListState()
 
     LazyColumn(
+        state = listState,
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(horizontal = 18.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -170,6 +173,7 @@ fun DashboardScreen(
                     key = { it },
                     onReorder = viewModel::reorderSections,
                     modifier = Modifier.fillMaxWidth(),
+                    scrollState = listState,
                 ) { sectionKey ->
                     Box(Modifier.padding(bottom = 12.dp)) {
                         when (sectionKey) {

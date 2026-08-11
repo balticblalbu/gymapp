@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
@@ -127,8 +128,10 @@ fun HistoryScreen(
 ) {
     val state by viewModel.state.collectAsState()
     var pendingDelete by remember { mutableStateOf<WorkoutDto?>(null) }
+    val listState = rememberLazyListState()
 
     LazyColumn(
+        state = listState,
         contentPadding = PaddingValues(horizontal = 18.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
@@ -196,6 +199,7 @@ fun HistoryScreen(
                     key = { it.id },
                     onReorder = { moved -> viewModel.reorder(moved.map { it.id }) },
                     modifier = Modifier.fillMaxWidth(),
+                    scrollState = listState,
                 ) { workout ->
                     Box(Modifier.padding(bottom = 12.dp)) {
                         WorkoutCard(

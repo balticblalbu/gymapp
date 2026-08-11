@@ -5,6 +5,7 @@ import android.content.Intent
 import android.widget.Toast
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Visibility
@@ -209,7 +210,10 @@ fun SettingsScreen(
         }
     }
 
+    val listState = rememberLazyListState()
+
     LazyColumn(
+        state = listState,
         contentPadding = PaddingValues(horizontal = 18.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
@@ -222,6 +226,7 @@ fun SettingsScreen(
                 key = { it },
                 onReorder = viewModel::reorderSections,
                 modifier = Modifier.fillMaxWidth(),
+                scrollState = listState,
             ) { sectionKey ->
                 Box(Modifier.padding(bottom = 12.dp)) {
                     when (sectionKey) {
