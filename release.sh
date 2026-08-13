@@ -61,7 +61,7 @@ JSON
 
 git add -A
 if ! git diff --cached --quiet; then
-  git -c user.name="Jan" -c user.email="jpaetrow@gmail.com" commit -q -m "Release $NAME (Code $CODE)
+  git commit -q -m "Release $NAME (Code $CODE)
 
 $NOTES"
   git push
